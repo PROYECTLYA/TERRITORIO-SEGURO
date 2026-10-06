@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ubicación de territorios seguros</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    :root { color-scheme: light; --ink:#182230; --muted:#637083; --blue:#1769aa; --line:#d8e0e9; }
+    * { box-sizing:border-box }
+    body { margin:0; background:#f3f6fa; color:var(--ink); font:15px/1.45 "Segoe UI",Arial,sans-serif }
+    header { padding:20px 26px; background:#123e32; color:white }
+    header { padding:16px 26px; background:#123e32; color:white; position:sticky; top:0; z-index:20; box-shadow:0 3px 12px #1028202b }
+    header h1 { margin:0 0 4px; font-size:22px }
+    header p { margin:0; color:#d6e8e0 }
+    .views { display:flex; gap:8px; margin-top:14px }
+    .views button { width:auto; min-height:34px; padding:6px 13px; background:#ffffff18; border-color:#ffffff55; color:white }
+    .views button.active { background:white; color:#123e32 }
+    main { display:grid; grid-template-columns:minmax(260px,330px) minmax(0,1fr); gap:18px; padding:18px; align-items:start }
+    main[hidden],.summary-view[hidden] { display:none !important }
+    main.full-view { grid-template-columns:minmax(0,1fr) }
+    main.full-view aside { display:none }
+    aside,.map-card { background:white; border:1px solid var(--line); border-radius:12px; box-shadow:0 4px 18px #16324f0b }
+    aside { padding:18px; position:sticky; top:12px }
+    h2 { font-size:16px; margin:0 0 12px }
+    .section { padding:0 0 17px; margin:0 0 17px; border-bottom:1px solid #e8edf2 }
+    .section:last-child { border:0; margin:0; padding:0 }
+    label { display:block; font-weight:600; font-size:13px; margin:11px 0 5px }
+    input,select,button { width:100%; min-height:40px; border:1px solid #c8d2de; border-radius:7px; padding:8px 10px; background:white; color:var(--ink); font:inherit }
+    input[type=file] { padding:7px; font-size:12px }
+    button { background:var(--blue); color:white; border-color:var(--blue); font-weight:650; cursor:pointer }
+    button.secondary { background:white; color:var(--ink); border-color:#c8d2de }
+    button:disabled { opacity:.5; cursor:not-allowed }
+    .filters { display:grid; grid-template-columns:1fr 1fr; gap:0 9px }
+    .hint,.status { color:var(--muted); font-size:12px }
+    .status { margin-top:8px; min-height:18px }
+    .pill { display:inline-block; border-radius:20px; background:#eef3f8; padding:3px 8px; font-size:12px; margin-top:8px }
+    .map-card { padding:10px; min-width:0 }
+    .map-top { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:2px 4px 10px }
+    .map-top h2 { margin:0 }
+    .legend { color:var(--muted); font-size:12px }
+    .map-wrap { position:relative; line-height:0; overflow:hidden; border-radius:7px; background:#eef1f4; cursor:crosshair }
+    .map-wrap img { display:block; width:100%; height:auto; user-select:none; pointer-events:none }
+    svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible }
+    .pin { cursor:pointer }
+    .pin circle { stroke:white; stroke-width:3; filter:drop-shadow(0 1px 2px #0008) }
+    .pin circle.blink { animation:blink 1s steps(2,end) infinite }
+    @keyframes blink { 50% { opacity:.22; filter:drop-shadow(0 0 8px currentColor) } }
+    .pin.selected circle { stroke:#17202a; stroke-width:4 }
+    .pin text { font:700 16px "Segoe UI",Arial,sans-serif; paint-order:stroke; stroke:white; stroke-width:3px; stroke-linejoin:round; fill:#17202a; text-anchor:middle; pointer-events:none }
+    .empty { padding:36px 18px; text-align:center; color:var(--muted); line-height:1.5 }
+    .summary-view { padding:18px; }
+    .summary-view[hidden] { display:none }
+    .summary-head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; align-items:end; margin-bottom:16px }
+    .summary-head h2 { font-size:21px; margin:0 0 3px }
+    .summary-note { color:var(--muted); font-size:13px }
+    .summary-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:16px }
+    .metric,.panel { background:white; border:1px solid var(--line); border-radius:12px; box-shadow:0 4px 18px #16324f0b }
+    .metric { padding:17px 19px }
+    .metric-label { font-size:13px; color:var(--muted) }
+    .metric-value { font-size:30px; font-weight:750; line-height:1.2; margin-top:5px }
+    .metric-total .metric-value { color:#1769aa }
+    .metric-good .metric-value { color:#159447 }
+    .metric-bad .metric-value { color:#d92d20 }
+    .panel { padding:17px; margin-bottom:16px; min-width:0 }
+    .panel h3 { margin:0 0 4px; font-size:16px }
+    .bar-chart { display:grid; gap:10px; margin-top:16px }
+    .bar-row { display:grid; grid-template-columns:110px minmax(100px,1fr) 58px; gap:10px; align-items:center; font-size:13px }
+    .bar-label { color:#364152 }
+    .bar-track { height:17px; border-radius:99px; background:#edf1f5; overflow:hidden }
+    .bar-fill { height:100%; border-radius:99px; background:#16834b; min-width:0; transition:width .25s ease }
+    .bar-value { text-align:right; font-variant-numeric:tabular-nums; font-weight:650 }
+    .area-charts { display:grid; grid-template-columns:minmax(0,1fr); gap:0 }
+    .area-chart-wrap { overflow-x:auto; overflow-y:hidden; margin-top:8px }
+    .area-chart-wrap svg { position:static; display:block; height:325px; overflow:visible }
+    .chart-legend { font-size:12px; color:var(--muted); margin-top:4px }
+    .table-wrap { overflow:auto; max-height:72vh; border:1px solid var(--line); border-radius:8px; margin-top:13px }
+    .weekly-table { border-collapse:separate; border-spacing:0; white-space:nowrap; font-size:12px; width:max-content; min-width:100% }
+    .weekly-table th,.weekly-table td { padding:7px 8px; text-align:center; border-right:1px solid #e7ecf1; border-bottom:1px solid #e7ecf1 }
+    .weekly-table thead th { background:#eef3f7; position:sticky; top:0; z-index:3 }
+    .weekly-table thead tr:first-child th { top:0 }
+    .weekly-table thead tr:nth-child(2) th { top:33px }
+    .weekly-table th.left,.weekly-table td.left { text-align:left }
+    .weekly-table .namecol { position:sticky; left:0; z-index:2; background:white; text-align:left }
+    .weekly-table thead .namecol { z-index:5; background:#eef3f7 }
+    .weekly-table .namecol.c2 { left:140px }
+    .weekly-table .namecol.c3 { left:280px }
+    .weekly-table th.namecol { min-width:140px }
+    .weekly-table td.rate { font-weight:700; font-variant-numeric:tabular-nums }
+    .weekly-table .area-row td { background:#e7eef5; color:#183b58; font-weight:750; border-top:2px solid #c8d4e0 }
+    .weekly-table .area-row td:first-child { text-align:left }
+    .weekly-table td.good { color:#137c42; background:#eff9f2 }
+    .weekly-table td.bad { color:#bd2b24; background:#fff1f0 }
+    .weekly-table td.future { background:#f7f9fb; color:#a0a9b5 }
+    .table-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px }
+    .table-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+    .table-actions button,.day-toggle { width:auto; min-height:34px; padding:6px 10px; background:white; color:#223247; border:1px solid #c8d2de; border-radius:7px; font:600 12px "Segoe UI",Arial,sans-serif; cursor:pointer }
+    .weekly-table .day-head { white-space:nowrap }
+    .weekly-table .day-toggle { margin-left:7px; min-width:26px; min-height:24px; padding:1px 6px; line-height:1 }
+    .table-toolbar input { width:min(280px,100%); min-height:36px }
+    .empty-summary { padding:34px 16px; text-align:center; color:var(--muted) }
+    @media(max-width:850px) { main { grid-template-columns:1fr } aside { position:static } }
+    @media(max-width:650px) { .summary-cards { grid-template-columns:1fr } .bar-row { grid-template-columns:86px minmax(50px,1fr) 50px } .weekly-table .namecol.c2 { left:115px } .weekly-table .namecol.c3 { left:230px } .weekly-table th.namecol { min-width:115px } }
+  </style>
+</head>
+<body>
+  <header><h1>Ubicación de territorios seguros</h1><p>Marca una ubicación en el plano y asígnale un territorio de la lista del libro.</p></header>
+  <main>
+  <header><h1>Territorios seguros</h1><p>Ubicación en plano y seguimiento semanal de reportes.</p><nav class="views"><button id="mapTab" class="active" type="button">Layout</button><button id="summaryTab" type="button">Análisis detallado</button></nav></header>
+  <main id="mapView">
+    <aside>
+      <div class="section">
+        <h2>1. Cargar lista de territorios</h2>
+        <label for="book">Selecciona el archivo de Excel</label>
+        <h2>1. Cargar bases de datos</h2>
+        <label for="book">Base de monitoreo (Sheet1 y Territorio Safety)</label>
+        <input id="book" type="file" accept=".xlsx,.xls">
+        <div id="bookStatus" class="status">Carga el libro para obtener la lista desde “Territorio Safety”.</div>
+        <label for="areaBook">Lista de territorios por área (LISTA TS.xlsx)</label>
+        <input id="areaBook" type="file" accept=".xlsx,.xls">
+        <div id="areaBookStatus" class="status">Carga LISTA TS.xlsx para aplicar su clasificación por área. Las demás áreas se toman de “Territorio Safety”.</div>
+        <span id="count" class="pill">Sin libro cargado</span>
+      </div>
+      <div class="section">
+        <h2>2. Colocar y relacionar</h2>
+        <button id="addMode" type="button">Agregar ubicación en el plano</button>
+        <p class="hint">Activa el botón y haz clic en el punto del plano. Después selecciona el marcador para asignarle un territorio.</p>
+        <label for="territory">Territorio para el marcador seleccionado</label>
+        <select id="territory" disabled><option value="">Carga el Excel primero</option></select>
+        <label for="pinName">Nombre visible del marcador</label>
+        <input id="pinName" type="text" placeholder="Ej. Zona 1" disabled>
+        <button id="deletePin" class="secondary" type="button" disabled style="margin-top:9px">Eliminar marcador seleccionado</button>
+        <div id="selectionStatus" class="status">Ningún marcador seleccionado.</div>
+      </div>
+      <div class="section">
+        <h2>3. Consultar registro</h2>
+        <p class="hint">Verde significa que hay un check para la fecha, turno y territorio elegidos; rojo significa que no aparece un registro.</p>
+        <div class="filters">
+          <div><label for="year">Año</label><input id="year" type="number" min="2000" max="2100" placeholder="2026"></div>
+          <div><label for="month">Mes</label><select id="month"><option value="">Todos</option></select></div>
+          <div><label for="day">Día</label><select id="day"><option value="">Todos</option></select></div>
+          <div><label for="shift">Turno</label><select id="shift"><option value="">Todos</option></select></div>
+        </div>
+        <div id="recordStatus" class="status">Carga el Excel para habilitar los filtros.</div>
+      </div>
+      <div class="hint">Las ubicaciones se guardan en este navegador. Usa “Exportar ubicaciones” para guardar una copia en JSON.</div>
+      <button id="export" class="secondary" type="button" style="margin-top:8px">Exportar ubicaciones</button>
+      <label for="importPins">Importar ubicaciones guardadas</label><input id="importPins" type="file" accept=".json">
+    </aside>
+    <section class="map-card">
+      <div class="map-top"><h2>Plano general</h2><div style="display:flex;align-items:center;gap:14px"><span class="legend"><span style="color:#d92d20">● Sin registro</span> &nbsp; <span style="color:#159447">● Con registro</span></span><button id="viewToggle" class="secondary" type="button" style="width:auto;min-height:34px;padding:6px 11px">Vista completa</button></div></div>
+      <div class="map-top"><h2>Plano general</h2><div style="display:flex;align-items:center;gap:14px"><span class="legend"><span style="color:#d92d20">● Sin registro</span> &nbsp; <span style="color:#159447">● Con registro</span></span></div></div>
+      <div class="map-wrap" id="mapWrap">
+        <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
+        <svg id="overlay" viewBox="0 0 2048 1166" aria-label="Marcadores de ubicación"></svg>
+      </div>
+      <div id="mapMessage" class="empty">Carga el Excel, agrega una ubicación y asígnale un territorio. Haz clic en un marcador para editar su relación.</div>
+    </section>
+  </main>
+  <section id="summaryView" class="summary-view" hidden>
+    <div class="summary-head"><div><h2>Análisis detallado de reportes</h2><div id="summaryContext" class="summary-note">Carga el Excel para generar el resumen.</div></div><div class="summary-note">Turnos: 1.º 22:00–06:00 · 2.º 06:00–14:00 · 3.º 14:00–22:00</div></div>
+    <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Territorios en la lista</div><div class="metric-value" id="totalTerritories">—</div></div><div class="metric metric-good"><div class="metric-label">Cumplen todos los turnos transcurridos</div><div class="metric-value" id="compliantTerritories">—</div></div><div class="metric metric-bad"><div class="metric-label">Con reportes pendientes</div><div class="metric-value" id="pendingTerritories">—</div></div></div>
+    <div class="area-charts"><div class="panel"><h3>Cumplimiento Semanal</h3><div id="weeklyChartCaption" class="summary-note">Acumulado hasta el día y turno vigente, agrupado por área.</div><div id="weeklyAreaChart" class="area-chart-wrap"><div class="empty-summary">Carga el Excel para ver el gráfico.</div></div><div class="chart-legend">Rojo: menor de 80% · Amarillo: 80–89% · Verde: 90% o más</div></div><div class="panel"><h3>D-1</h3><div id="d1ChartCaption" class="summary-note">Cumplimiento del día calendario anterior, considerando sus tres turnos.</div><div id="d1AreaChart" class="area-chart-wrap"><div class="empty-summary">Carga el Excel para ver el gráfico.</div></div><div class="chart-legend">Rojo: menor de 80% · Amarillo: 80–89% · Verde: 90% o más</div></div></div>
+    <div class="panel"><div class="table-toolbar"><div><h3>Detalle semanal por territorio y turno</h3><div id="tableCaption" class="summary-note">La tabla sigue la estructura de “Territorio Safety”.</div></div><div class="table-actions"><button id="toggleAllShifts" type="button">Mostrar todos los turnos</button><input id="tableSearch" type="search" placeholder="Buscar área o territorio"></div></div><div class="table-wrap"><div id="weeklyTable"><div class="empty-summary">Carga el Excel para ver el detalle.</div></div></div></div>
+  </section>
+<script>
+(() => {
+  const KEY='territorios-seguros-ubicaciones-v1';
+  const $=id=>document.getElementById(id);
+  const state={territories:[], shifts:[], records:[], loaded:false, pins:[], selected:null, addMode:false};
+  $('viewToggle').addEventListener('click',()=>{
+    const full=document.querySelector('main').classList.toggle('full-view');
+    $('viewToggle').textContent=full?'Mostrar filtros':'Vista completa';
+  });
+  const state={territories:[], territoryRows:[], areaMappings:new Map(), shifts:[], records:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, pins:[], selected:null, addMode:false};
+  $('mapTab').addEventListener('click',()=>showView('map'));
+  $('summaryTab').addEventListener('click',()=>{showView('summary');updateSummary();});
+  function showView(view){
+    const summary=view==='summary';
+    document.querySelector('main').hidden=summary;
+    $('summaryView').hidden=!summary;
+    $('mapTab').classList.toggle('active',!summary);
+    $('summaryTab').classList.toggle('active',summary);
+  }
+  const colors={missing:'#d92d20',done:'#159447',unmapped:'#1769aa'};
+  try { state.pins=JSON.parse(localStorage.getItem(KEY)||'[]'); } catch { state.pins=[]; }
+  for(let i=1;i<=12;i++) $('month').insertAdjacentHTML('beforeend',`<option value="${i}">${String(i).padStart(2,'0')}</option>`);
+  for(let i=1;i<=31;i++) $('day').insertAdjacentHTML('beforeend',`<option value="${i}">${i}</option>`);
+  const norm=v=>String(v??'').trim().replace(/\s+/g,' ');
+  function save(){localStorage.setItem(KEY,JSON.stringify(state.pins)); render();}
+  function dateParts(v, cell){
+    if(cell && cell.t==='d' && v instanceof Date) return [v.getFullYear(),v.getMonth()+1,v.getDate()];
+    if(typeof v==='number' && window.XLSX){const d=XLSX.SSF.parse_date_code(v); return d?[d.y,d.m,d.d]:null;}
+    if(v instanceof Date) return [v.getFullYear(),v.getMonth()+1,v.getDate()];
+    const s=String(v??'').trim();
+    let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/); if(m) return [+m[3],+m[2],+m[1]];
+    m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return [+m[1],+m[2],+m[3]];
+    return null;
+  }
+  $('book').addEventListener('change', async e=>{
+    const file=e.target.files[0]; if(!file)return;
+    if(!window.XLSX){$('bookStatus').textContent='No se pudo cargar el lector de Excel. Revisa la conexión a internet y vuelve a abrir la página.';return;}
+    $('bookStatus').textContent='Leyendo libro…';
+    try{
+      const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+      const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});
+      const dash=wb.Sheets['Territorio Safety'];
+      const raw=wb.Sheets['Sheet1'];
+      if(!dash || !raw) throw new Error('No se encontraron las hojas “Territorio Safety” y “Sheet1”.');
+      const ref=dash['!ref']||'A1:C1', range=XLSX.utils.decode_range(ref), territories=[];
+      for(let r=8;r<=range.e.r;r++) { const v=dash[XLSX.utils.encode_cell({r,c:2})]?.v; const t=norm(v); if(t && !territories.includes(t)) territories.push(t); }
+      const ref=dash['!ref']||'A1:C1', territoryRows=[], territories=[];
+      for(let r=8;r<=150;r++) {
+        const get=c=>dash[XLSX.utils.encode_cell({r,c})]?.v;
+        const territory=norm(get(2)); if(!territory) continue;
+        territoryRows.push({line:norm(get(0)),department:norm(get(1)),territory});
+        if(!territories.includes(territory)) territories.push(territory);
+      }
+      if(!territories.length) throw new Error('No se encontraron territorios en la columna C de “Territorio Safety”.');
+      state.territories=territories;
+      state.territoryRows=territoryRows;
+      const shifts=new Set(), records=[], sheetRange=XLSX.utils.decode_range(raw['!ref']||'A1');
+      for(let r=1;r<=sheetRange.e.r;r++){
+        const dateCell=raw[XLSX.utils.encode_cell({r,c:8})], shift=norm(raw[XLSX.utils.encode_cell({r,c:9})]?.v), territory=norm(raw[XLSX.utils.encode_cell({r,c:64})]?.v);
+        if(r===1) continue;
+        const parts=dateParts(dateCell?.v,dateCell); if(!parts) continue;
+        if(shift) shifts.add(shift);
+        if(territory) records.push({year:parts[0],month:parts[1],day:parts[2],shift,territory});
+      }
+      state.shifts=[...shifts].sort((a,b)=>a.localeCompare(b,'es'));
+      state.records=records;
+      state.loaded=true;
+      fillTerritories(); fillShifts();
+      $('bookStatus').textContent=`Lista y registros cargados desde ${file.name}.`;
+      $('count').textContent=`${territories.length} territorios · ${records.length.toLocaleString('es-MX')} registros con territorio`;
+      $('recordStatus').textContent='Elige fecha y turno para actualizar los colores.';
+      render();
+      updateSummary();
+    }catch(err){$('bookStatus').textContent=err.message||'No se pudo leer el libro.';}
+  });
+  $('areaBook').addEventListener('change',async e=>{
+    const file=e.target.files[0]; if(!file)return;
+    if(!window.XLSX){$('areaBookStatus').textContent='No se pudo cargar el lector de Excel. Revisa la conexión a internet.';return;}
+    try{
+      const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}), sheet=wb.Sheets['Hoja1']||wb.Sheets[wb.SheetNames[0]];
+      if(!sheet)throw new Error('El archivo no contiene una hoja de datos.');
+      const data=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''}), mappings=new Map(); let rows=0;
+      for(let i=1;i<data.length;i++){
+        const row=data[i], area=norm(row[0]), department=norm(row[1]), territory=norm(row[2]);
+        if(area&&territory){mappings.set(normalizeKey(territory),{area,department});rows++;}
+      }
+      if(!mappings.size)throw new Error('No se encontró la estructura Linea, DEPARTAMENTO, TERRITORIO.');
+      state.areaMappings=mappings;
+      $('areaBookStatus').textContent=`Leídas ${rows} filas (${mappings.size} territorios distintos) desde ${file.name}. Los demás usan el área de “Territorio Safety”.`;
+      if(state.loaded)updateSummary();
+    }catch(err){$('areaBookStatus').textContent=err.message||'No se pudo leer la lista de áreas.';}
+  });
+  function fillTerritories(){
+    const s=$('territory'); s.innerHTML='<option value="">Selecciona un territorio</option>'+state.territories.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+    s.disabled=!state.selected;
+  }
+  function fillShifts(){ $('shift').innerHTML='<option value="">Todos</option>'+state.shifts.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join(''); }
+  function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function selectedPin(){return state.pins.find(p=>p.id===state.selected);}
+  function syncEditor(){
+    const p=selectedPin(), enabled=!!p;
+    $('territory').disabled=!enabled||!state.territories.length;
+    $('pinName').disabled=!enabled; $('deletePin').disabled=!enabled;
+    $('territory').value=p?.territory||''; $('pinName').value=p?.name||'';
+    $('selectionStatus').textContent=p?`Editando ${p.name||'marcador'}${p.territory?' · '+p.territory:''}.`:'Ningún marcador seleccionado.';
+  }
+  function checkStatus(territory){
+    if(!territory || !state.loaded) return null;
+    const year=$('year').value, month=$('month').value, day=$('day').value, shift=$('shift').value;
+    return state.records.some(r=>r.territory===territory && (!year||r.year===+year) && (!month||r.month===+month) && (!day||r.day===+day) && (!shift||r.shift===shift));
+  }
+  function render(){
+    const svg=$('overlay'); svg.innerHTML='';
+    for(const p of state.pins){
+      const status=checkStatus(p.territory), color=status===null?colors.unmapped:(status?colors.done:colors.missing);
+      const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','pin'+(p.id===state.selected?' selected':'')); g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`); g.dataset.id=p.id;
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('r','13'); c.setAttribute('fill',color); c.style.color=color; if(status!==null)c.setAttribute('class','blink');
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('y','-19'); t.textContent=p.name||p.territory||'Ubicación';
+      g.append(c,t); g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;state.addMode=false;$('addMode').textContent='Agregar ubicación en el plano';syncEditor();render();}); svg.append(g);
+    }
+    $('mapWrap').style.cursor=state.addMode?'crosshair':'default';
+    $('mapMessage').textContent=state.pins.length?`${state.pins.length} ubicación(es) marcada(s). Verde intermitente = hay registro con los filtros actuales; rojo intermitente = no hay registro. Los filtros vacíos incluyen todos sus valores.`:'Carga el Excel, agrega una ubicación y asígnale un territorio. Haz clic en un marcador para editar su relación.';
+  }
+  const weekdays=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  const turnNames=['Primer turno','Segundo turno','Tercer turno'];
+  const turnHours=['22:00–06:00','06:00–14:00','14:00–22:00'];
+  const dayNames=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
+  const weeklyAreaOrder=['Cocimientos','Cuartos Frios','Ingenieria','L02','L12','L10','Patrimonial','L05','Calidad','L11','L07','S&E','Logistica','Tapanco','L09','L04','Periferico','L06','Mtto Env','Ambiental','L03'];
+  const d1AreaOrder=['Cocimientos','Cuartos Frios','Ingenieria','Patrimonial','Periferico','S&E','L04','L09','L11','L05','Ambiental','Calidad','Logistica','L07','L02','L12','L06','L03','Mtto Env','L10','Tapanco'];
+  function normalizeKey(v){return norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es-MX');}
+  function sortAreas(areas,reference){
+    const order=new Map(reference.map((v,i)=>[normalizeKey(v),i]));
+    return [...areas].sort((a,b)=>(order.get(normalizeKey(a))??999)-(order.get(normalizeKey(b))??999)||a.localeCompare(b,'es'));
+  }
+  function displayArea(area){
+    const labels={'cuartos frios':'Cuartos fríos','ingenieria':'Ingeniería','logistica':'Logística','periferico':'Periférico'};
+    return labels[normalizeKey(area)]||area;
+  }
+  const dateKey=(y,m,d)=>`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  function shiftNumber(value){
+    const v=norm(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    if(v.includes('primer')||v.includes('1er')||v==='1')return 1;
+    if(v.includes('segundo')||v.includes('2do')||v==='2')return 2;
+    if(v.includes('tercer')||v.includes('3er')||v==='3')return 3;
+    return 0;
+  }
+  function mexicoNow(){
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Mexico_City',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',hourCycle:'h23'}).formatToParts(new Date());
+    const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+    const year=+p.year, month=+p.month, day=+p.day, hour=+p.hour;
+    const utcDate=new Date(Date.UTC(year,month-1,day));
+    return {year,month,day,hour,dayIndex:(utcDate.getUTCDay()+6)%7,utcDate};
+  }
+  function isoWeek(year,month,day){
+    const d=new Date(Date.UTC(year,month-1,day));
+    d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));
+    const y=d.getUTCFullYear(), first=new Date(Date.UTC(y,0,1));
+    return {year:y,week:Math.ceil((((d-first)/86400000)+1)/7)};
+  }
+  function renderWeeklyTable(){
+    if(!state.weeklyRows.length){$('weeklyTable').innerHTML='<div class="empty-summary">No hay territorios para mostrar.</div>';return;}
+    $('toggleAllShifts').textContent=state.collapsedDays.size===7?'Mostrar todos los turnos':'Ocultar todos los turnos';
+    const query=normalizeKey($('tableSearch').value);
+    const visible=state.weeklyRows.filter(r=>!query||normalizeKey(`${r.area} ${r.department} ${r.territory}`).includes(query));
+    let html='<table class="weekly-table"><thead><tr><th rowspan="2" class="namecol">Área / Línea</th><th rowspan="2" class="namecol c2">Departamento</th><th rowspan="2" class="namecol c3">Territorio</th><th rowspan="2">% semanal</th><th rowspan="2">% D-1</th>';
+    for(let d=0;d<7;d++){
+      const collapsed=state.collapsedDays.has(d), span=collapsed?1:4, sign=collapsed?'+':'−';
+      html+=`<th colspan="${span}" class="day-head">${weekdays[d]}<button type="button" class="day-toggle" data-toggle-day="${d}" aria-label="${collapsed?'Mostrar':'Ocultar'} turnos de ${weekdays[d]}">${sign}</button></th>`;
+    }
+    html+='</tr><tr>';
+    for(let d=0;d<7;d++){
+      if(!state.collapsedDays.has(d))html+='<th>1.º turno</th><th>2.º turno</th><th>3.º turno</th>';
+      html+='<th>Promedio</th>';
+    }
+    html+='</tr></thead><tbody>';
+    const areas=sortAreas(new Set(visible.map(r=>r.area)),weeklyAreaOrder);
+    for(const area of areas){
+      const group=visible.filter(r=>r.area===area), weeklyAvg=group.reduce((s,r)=>s+r.weeklyRate,0)/(group.length||1), d1Avg=group.reduce((s,r)=>s+r.d1Rate,0)/(group.length||1);
+      const dayColumns=7+(7-state.collapsedDays.size)*3;
+      html+=`<tr class="area-row"><td colspan="3">${esc(displayArea(area))} · ${group.length} territorios</td><td>${Math.round(weeklyAvg*100)}%</td><td>${Math.round(d1Avg*100)}%</td><td colspan="${dayColumns}"></td></tr>`;
+      for(const r of group){
+        const weeklyPct=Math.round(r.weeklyRate*100), d1Pct=Math.round(r.d1Rate*100);
+        html+=`<tr><td class="namecol left">${esc(r.area)}</td><td class="namecol c2 left">${esc(r.department)}</td><td class="namecol c3 left">${esc(r.territory)}</td><td class="rate ${weeklyPct===100?'good':'bad'}">${weeklyPct}%</td><td class="rate ${d1Pct===100?'good':'bad'}">${d1Pct}%</td>`;
+        for(let d=0;d<7;d++){
+          if(!state.collapsedDays.has(d)){
+            for(let turn=1;turn<=3;turn++){
+              const val=r.cells[d][turn-1];
+              html+=val===null?'<td class="future">—</td>':`<td class="${val?'good':'bad'}">${val?'1':'0'}</td>`;
+            }
+          }
+          const avg=r.dailyRates[d];
+          html+=avg===null?'<td class="future">—</td>':`<td class="rate ${avg===1?'good':'bad'}">${Math.round(avg*100)}%</td>`;
+        }
+        html+='</tr>';
+      }
+    }
+    html+='</tbody></table>';
+    $('weeklyTable').innerHTML=visible.length?html:'<div class="empty-summary">No hay territorios que coincidan con la búsqueda.</div>';
+  }
+  function updateSummary(){
+    if(!state.loaded)return;
+    const now=mexicoNow(), currentShift=now.hour>=22||now.hour<6?1:(now.hour<14?2:3), monday=new Date(now.utcDate.getTime()-now.dayIndex*86400000), mondayISO=isoWeek(monday.getUTCFullYear(),monday.getUTCMonth()+1,monday.getUTCDate());
+    const shiftWord=turnNames[currentShift-1], dateLabel=`${weekdays[now.dayIndex]} ${String(now.day).padStart(2,'0')}/${String(now.month).padStart(2,'0')}/${now.year}`;
+    $('summaryContext').textContent=`Semana ${mondayISO.week} de ${mondayISO.year} · corte al ${dateLabel}, ${shiftWord} (${turnHours[currentShift-1]}).`;
+    $('weeklyChartCaption').textContent=`Checks registrados ÷ turnos transcurridos, desde el lunes hasta ${dayNames[now.dayIndex]}, ${shiftWord} (${turnHours[currentShift-1]}), agrupado por área.`;
+    const previousDate=new Date(now.utcDate.getTime()-86400000), d1Key=dateKey(previousDate.getUTCFullYear(),previousDate.getUTCMonth()+1,previousDate.getUTCDate());
+    $('d1ChartCaption').textContent=`${String(previousDate.getUTCDate()).padStart(2,'0')}/${String(previousDate.getUTCMonth()+1).padStart(2,'0')}/${previousDate.getUTCFullYear()} · los tres turnos del día anterior.`;
+    $('tableCaption').textContent='D-1 = promedio de los 3 turnos del día anterior. % semanal = promedio de los cumplimientos diarios desde el lunes hasta el turno vigente. En el detalle por turno, 1 = check registrado y 0 = sin check; los turnos futuros quedan vacíos.';
+    const checks=new Set();
+    for(const r of state.records){
+      const turn=shiftNumber(r.shift); if(!turn)continue;
+      checks.add(`${norm(r.territory)}|${dateKey(r.year,r.month,r.day)}|${turn}`);
+    }
+    const maxTodayShift=currentShift;
+    state.weeklyRows=state.territoryRows.map(meta=>{
+      const areaInfo=state.areaMappings.get(normalizeKey(meta.territory));
+      const area=areaInfo?.area||meta.line, department=areaInfo?.department||meta.department;
+      const cells=Array.from({length:7},()=>[null,null,null]);
+      const dailyRates=Array(7).fill(null); let weeklySum=0, daysCount=0, allComplete=true, d1Completed=0;
+      for(let t=1;t<=3;t++)if(checks.has(`${norm(meta.territory)}|${d1Key}|${t}`))d1Completed++;
+      for(let d=0;d<=now.dayIndex;d++){
+        const date=new Date(monday.getTime()+d*86400000), key=dateKey(date.getUTCFullYear(),date.getUTCMonth()+1,date.getUTCDate());
+        const shiftsDue=d<now.dayIndex?3:maxTodayShift; let completed=0;
+        for(let t=1;t<=3;t++){
+          if(t>shiftsDue)continue;
+          const has=checks.has(`${meta.territory}|${key}|${t}`); cells[d][t-1]=has?1:0;
+          if(has)completed++;else allComplete=false;
+        }
+        dailyRates[d]=completed/shiftsDue; weeklySum+=dailyRates[d]; daysCount++;
+      }
+      const weeklyRate=daysCount?weeklySum/daysCount:0;
+      return {...meta,area,department,cells,dailyRates,weeklyRate,allComplete,d1Rate:d1Completed/3};
+    });
+    const total=state.weeklyRows.length, compliant=state.weeklyRows.filter(r=>r.allComplete).length;
+    $('totalTerritories').textContent=total.toLocaleString('es-MX');
+    $('compliantTerritories').textContent=compliant.toLocaleString('es-MX');
+    $('pendingTerritories').textContent=(total-compliant).toLocaleString('es-MX');
+    renderAreaChart('weeklyAreaChart',aggregateAreas(state.weeklyRows,'weeklyRate'),weeklyAreaOrder);
+    renderAreaChart('d1AreaChart',aggregateAreas(state.weeklyRows,'d1Rate'),d1AreaOrder);
+    renderWeeklyTable();
+  }
+  function aggregateAreas(rows,key){
+    const groups=new Map();
+    for(const row of rows){if(!groups.has(row.area))groups.set(row.area,[]);groups.get(row.area).push(row[key]);}
+    return [...groups].map(([area,values])=>({area,value:values.reduce((a,b)=>a+b,0)/(values.length||1)}));
+  }
+  function renderAreaChart(id,items,reference){
+    const container=$(id);
+    if(!items.length){container.innerHTML='<div class="empty-summary">No hay territorios clasificados por área.</div>';return;}
+    const byKey=new Map(items.map(x=>[normalizeKey(x.area),x]));
+    const ordered=sortAreas(items.map(x=>x.area),reference).map(a=>byKey.get(normalizeKey(a))).filter(Boolean);
+    const step=36,width=Math.max(ordered.length*step+48,360),height=325,base=190,maxBar=128;
+    let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img">`;
+    svg+=`<line x1="28" y1="${base}" x2="${width-12}" y2="${base}" stroke="#bfc8d2" stroke-width="1"/>`;
+    ordered.forEach((item,i)=>{
+      const pct=Math.max(0,Math.min(100,item.value*100)), x=36+i*step, barH=pct/100*maxBar, y=base-barH;
+      const fill=pct>=90?'#00bf63':pct>=80?'#ffb800':'#ff1010';
+      svg+=`<rect x="${x}" y="${y}" width="23" height="${barH}" fill="${fill}"><title>${esc(displayArea(item.area))}: ${Math.round(pct)}%</title></rect>`;
+      svg+=`<text x="${x+12}" y="${base-5}" transform="rotate(-90 ${x+12} ${base-5})" text-anchor="start" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#111">${Math.round(pct)}%</text>`;
+      svg+=`<text x="${x+17}" y="${base+16}" transform="rotate(-48 ${x+17} ${base+16})" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#525b65">${esc(displayArea(item.area))}</text>`;
+    });
+    svg+='</svg>';container.innerHTML=svg;
+  }
+  $('tableSearch').addEventListener('input',renderWeeklyTable);
+  $('toggleAllShifts').addEventListener('click',()=>{
+    if(state.collapsedDays.size===7)state.collapsedDays.clear();else state.collapsedDays=new Set([0,1,2,3,4,5,6]);
+    renderWeeklyTable();
+  });
+  $('weeklyTable').addEventListener('click',ev=>{
+    const button=ev.target.closest('[data-toggle-day]'); if(!button)return;
+    const day=+button.dataset.toggleDay;
+    if(state.collapsedDays.has(day))state.collapsedDays.delete(day);else state.collapsedDays.add(day);
+    renderWeeklyTable();
+  });
+  $('addMode').addEventListener('click',()=>{state.addMode=!state.addMode;$('addMode').textContent=state.addMode?'Haz clic en el plano…':'Agregar ubicación en el plano';});
+  $('overlay').addEventListener('click',ev=>{
+    if(!state.addMode)return;
+    const rect=ev.currentTarget.getBoundingClientRect(), x=(ev.clientX-rect.left)/rect.width, y=(ev.clientY-rect.top)/rect.height;
+    const p={id:crypto.randomUUID(),x,y,name:`Ubicación ${state.pins.length+1}`,territory:''}; state.pins.push(p);state.selected=p.id;state.addMode=false;$('addMode').textContent='Agregar ubicación en el plano';save();syncEditor();
+  });
+  $('territory').addEventListener('change',e=>{const p=selectedPin();if(p){p.territory=e.target.value; if(p.territory && /^Ubicación \d+$/.test(p.name))p.name=p.territory;save();syncEditor();}});
+  $('pinName').addEventListener('input',e=>{const p=selectedPin();if(p){p.name=e.target.value;save();}});
+  $('deletePin').addEventListener('click',()=>{state.pins=state.pins.filter(p=>p.id!==state.selected);state.selected=null;save();syncEditor();});
+  for(const id of ['year','month','day','shift']) for(const eventName of ['input','change']) $(id).addEventListener(eventName,()=>{ $('recordStatus').textContent='Marcadores actualizados automáticamente con los filtros actuales.';render();});
+  $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
+  $('importPins').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data))throw Error();state.pins=data;state.selected=null;save();syncEditor();}catch{$('selectionStatus').textContent='El archivo de ubicaciones no tiene un formato válido.';}});
+  fillTerritories(); syncEditor(); render();
+  setInterval(()=>{if(!$('summaryView').hidden)updateSummary();},60000);
+})();
+</script>
+</body>
+</html>
