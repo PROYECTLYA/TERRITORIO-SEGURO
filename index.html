@@ -9,7 +9,6 @@
     :root { color-scheme: light; --ink:#182230; --muted:#637083; --blue:#1769aa; --line:#d8e0e9; }
     * { box-sizing:border-box }
     body { margin:0; background:#f3f6fa; color:var(--ink); font:15px/1.45 "Segoe UI",Arial,sans-serif }
-    header { padding:20px 26px; background:#123e32; color:white }
     header { padding:16px 26px; background:#123e32; color:white; position:sticky; top:0; z-index:20; box-shadow:0 3px 12px #1028202b }
     header h1 { margin:0 0 4px; font-size:22px }
     header p { margin:0; color:#d6e8e0 }
@@ -104,14 +103,10 @@
   </style>
 </head>
 <body>
-  <header><h1>Ubicación de territorios seguros</h1><p>Marca una ubicación en el plano y asígnale un territorio de la lista del libro.</p></header>
-  <main>
   <header><h1>Territorios seguros</h1><p>Ubicación en plano y seguimiento semanal de reportes.</p><nav class="views"><button id="mapTab" class="active" type="button">Layout</button><button id="summaryTab" type="button">Análisis detallado</button></nav></header>
   <main id="mapView">
     <aside>
       <div class="section">
-        <h2>1. Cargar lista de territorios</h2>
-        <label for="book">Selecciona el archivo de Excel</label>
         <h2>1. Cargar bases de datos</h2>
         <label for="book">Base de monitoreo (Sheet1 y Territorio Safety)</label>
         <input id="book" type="file" accept=".xlsx,.xls">
@@ -149,7 +144,6 @@
     </aside>
     <section class="map-card">
       <div class="map-top"><h2>Plano general</h2><div style="display:flex;align-items:center;gap:14px"><span class="legend"><span style="color:#d92d20">● Sin registro</span> &nbsp; <span style="color:#159447">● Con registro</span></span><button id="viewToggle" class="secondary" type="button" style="width:auto;min-height:34px;padding:6px 11px">Vista completa</button></div></div>
-      <div class="map-top"><h2>Plano general</h2><div style="display:flex;align-items:center;gap:14px"><span class="legend"><span style="color:#d92d20">● Sin registro</span> &nbsp; <span style="color:#159447">● Con registro</span></span></div></div>
       <div class="map-wrap" id="mapWrap">
         <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
         <svg id="overlay" viewBox="0 0 2048 1166" aria-label="Marcadores de ubicación"></svg>
@@ -167,12 +161,12 @@
 (() => {
   const KEY='territorios-seguros-ubicaciones-v1';
   const $=id=>document.getElementById(id);
-  const state={territories:[], shifts:[], records:[], loaded:false, pins:[], selected:null, addMode:false};
+  const state={territories:[], territoryRows:[], areaMappings:new Map(), shifts:[], records:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, pins:[], selected:null, addMode:false};
   $('viewToggle').addEventListener('click',()=>{
-    const full=document.querySelector('main').classList.toggle('full-view');
+    const map=$('mapView');
+    const full=map.classList.toggle('full-view');
     $('viewToggle').textContent=full?'Mostrar filtros':'Vista completa';
   });
-  const state={territories:[], territoryRows:[], areaMappings:new Map(), shifts:[], records:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, pins:[], selected:null, addMode:false};
   $('mapTab').addEventListener('click',()=>showView('map'));
   $('summaryTab').addEventListener('click',()=>{showView('summary');updateSummary();});
   function showView(view){
@@ -202,13 +196,10 @@
     if(!window.XLSX){$('bookStatus').textContent='No se pudo cargar el lector de Excel. Revisa la conexión a internet y vuelve a abrir la página.';return;}
     $('bookStatus').textContent='Leyendo libro…';
     try{
-      const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
       const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});
       const dash=wb.Sheets['Territorio Safety'];
       const raw=wb.Sheets['Sheet1'];
       if(!dash || !raw) throw new Error('No se encontraron las hojas “Territorio Safety” y “Sheet1”.');
-      const ref=dash['!ref']||'A1:C1', range=XLSX.utils.decode_range(ref), territories=[];
-      for(let r=8;r<=range.e.r;r++) { const v=dash[XLSX.utils.encode_cell({r,c:2})]?.v; const t=norm(v); if(t && !territories.includes(t)) territories.push(t); }
       const ref=dash['!ref']||'A1:C1', territoryRows=[], territories=[];
       for(let r=8;r<=150;r++) {
         const get=c=>dash[XLSX.utils.encode_cell({r,c})]?.v;
