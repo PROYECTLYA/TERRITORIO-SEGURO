@@ -155,26 +155,26 @@
   <section id="homeView" class="workspace-view">
     <div class="workspace-head"><div><h2>Panel de Territorio Seguro</h2><div class="summary-note">Registra condiciones y eventos, consulta reportes y ubica los riesgos en el plano.</div></div></div>
     <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Checks registrados</div><div class="metric-value" id="homeReportCount">0</div></div><div class="metric metric-bad"><div class="metric-label">Checks con respuestas NOK</div><div class="metric-value" id="homeHighCount">0</div></div><div class="metric metric-good"><div class="metric-label">Marcadores en el mapa</div><div class="metric-value" id="homePinCount">0</div></div></div>
-    <div class="summary-cards"><button type="button" data-view="register">＋ Registrar un reporte</button><button type="button" data-view="records">Ver y gestionar registros</button><button type="button" data-view="map">Abrir mapa de riesgo</button></div>
+    <div class="summary-cards"><button type="button" data-view="register">＋ Registrar check</button><button type="button" data-view="records">Ver y gestionar registros</button><button type="button" data-view="map">Abrir mapa de riesgo</button></div>
   </section>
   <section id="registerView" class="workspace-view" hidden>
     <div class="workspace-head"><div><h2 id="formHeading">Monitoreo del dueño de territorio</h2><div class="summary-note">Completa el check del territorio observado.</div></div></div>
     <form id="reportForm" class="check-form">
       <input id="reportId" type="hidden">
       <section class="check-card"><h3>Datos del dueño de territorio</h3>
-        <div class="field-grid"><div class="field-block"><label class="field-title" for="sapNumber">1. Número SAP <span class="required-mark">*</span></label><input id="sapNumber" type="number" min="2" step="1" required placeholder="Escriba un número mayor que 1"></div>
+        <div class="field-grid"><div class="field-block"><label class="field-title" for="sapNumber">1. Número SAP <span class="required-mark">*</span></label><input id="sapNumber" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="20" autocomplete="off" required placeholder="Escriba su número SAP"></div>
         <div class="field-block"><label class="field-title" for="ownerName">2. Nombre completo del dueño del territorio <span class="required-mark">*</span></label><input id="ownerName" type="text" maxlength="120" required></div>
         <div class="field-block"><label class="field-title" for="reportDate">3. Fecha en que se realiza el check <span class="required-mark">*</span></label><input id="reportDate" type="date" required></div>
         <div class="field-block"><label class="field-title" for="reportShift">4. Turno en el que se está realizando el check <span class="required-mark">*</span></label><select id="reportShift" required><option value="">Selecciona</option><option>Primer turno</option><option>Segundo turno</option><option>Tercer turno</option></select></div></div>
         <div class="field-block"><span class="field-title">5. Selecciona si perteneces a <span class="required-mark">*</span></span><div class="choice-row"><label><input type="radio" name="entityType" value="PLANTA" required> PLANTA</label><label><input type="radio" name="entityType" value="COMPAÑÍA" required> COMPAÑÍA</label></div></div>
         <div class="field-grid"><div class="field-block" id="departmentBlock" hidden><label class="field-title" for="departmentSelect">6. Departamento al que perteneces <span class="required-mark">*</span></label><select id="departmentSelect"><option value="">Selecciona un departamento</option></select></div>
         <div class="field-block" id="companyBlock" hidden><label class="field-title" for="companySelect">6. Compañía a la que perteneces <span class="required-mark">*</span></label><select id="companySelect"><option value="">Selecciona una compañía</option></select></div>
-        <div class="field-block" id="territorySelectBlock" hidden><label class="field-title" for="checkTerritory">7. Selecciona tu territorio <span class="required-mark">*</span></label><select id="checkTerritory"><option value="">Primero selecciona el departamento</option></select><span id="territoryHint" class="question-hint" role="status"></span></div>
-        <div class="field-block" id="companyTerritoryBlock" hidden><label class="field-title" for="companyTerritory">7. Selecciona tu territorio <span class="required-mark">*</span></label><input id="companyTerritory" type="text" maxlength="120" placeholder="Escribe el territorio" ></div></div>
+        <div class="field-block" id="territorySelectBlock" hidden><label class="field-title" for="checkTerritory">7. Selecciona tu territorio <span class="required-mark">*</span></label><select id="checkTerritory"><option value="">Primero selecciona el departamento</option></select><span id="territoryHint" class="question-hint" role="status"></span></div></div>
       </section>
       <section class="check-card"><h3>8. Atienda las siguientes preguntas mientras observas tu Territorio <span class="required-mark">*</span></h3><p>INICIO / TÉRMINO DE TURNO · Selecciona OK, NOK o NA para cada pregunta.</p><div id="startMatrix" class="matrix-scroll"></div></section>
       <section class="check-card"><h3>9. Atienda las siguientes preguntas mientras observa el trabajo, la tarea, el Territorio <span class="required-mark">*</span></h3><p>DURANTE EL TURNO · Selecciona OK, NOK o NA para cada pregunta.</p><div id="duringMatrix" class="matrix-scroll"></div></section>
-      <section class="check-card"><h3>10. ¿Es necesario generar una acción? <span class="required-mark">*</span></h3><div class="choice-row"><label><input type="radio" name="actionNeeded" value="Sí" required> Sí</label><label><input type="radio" name="actionNeeded" value="No" required> No</label></div><div id="actionDetailsBlock" class="field-block" hidden><label class="field-title" for="actionDetails">11. Acción a generar. Recuerda agregar el “#MonitoreoVPO” antes de colocar tu acción. Puedes agregar un # referente a alguna alerta o semana de aprendizaje. Ej.: PARA ALERTAS DE SEGURIDAD #eventoMAZCredit o para semanas de aprendizaje #SDA <span class="required-mark">*</span></label><textarea id="actionDetails" maxlength="2000" placeholder="Escriba su respuesta"></textarea></div></section>
+      <section class="check-card"><h3>10. ¿Es necesario generar una acción? <span class="required-mark">*</span></h3><div class="choice-row"><label><input type="radio" name="actionNeeded" value="Sí" required> Sí</label><label><input type="radio" name="actionNeeded" value="No" required> No</label></div><div id="actionDetailsBlock" class="field-block" hidden><label class="field-title" for="actionDetails">11. Acción a generar. El sistema agregará “#TS” al inicio de tu texto. Puedes agregar un # referente a alguna alerta o semana de aprendizaje. <span class="required-mark">*</span></label><textarea id="actionDetails" maxlength="2000" placeholder="Escriba la acción a generar; #TS se agregará automáticamente"></textarea></div></section>
+      <section class="check-card"><h3>12. ¿El riesgo de sufrir un accidente es inminente en tu territorio? <span class="required-mark">*</span></h3><div class="choice-row"><label><input type="radio" name="imminentRisk" value="Sí" required> Sí</label><label><input type="radio" name="imminentRisk" value="No" required> No</label></div><p class="question-hint">Sí activa el semáforo rojo del layout; No activa el semáforo verde.</p></section>
       <div class="form-actions"><button id="saveReport" type="submit">Enviar check</button><button id="cancelEdit" class="secondary" type="button" hidden>Cancelar</button></div><div id="reportFormStatus" class="status" role="status"></div>
     </form>
   </section>
@@ -183,9 +183,9 @@
     <aside>
       <div class="section">
         <h2>1. Datos del panel</h2>
-        <p class="hint">El panel lee automáticamente el libro datos.xlsx publicado junto al sitio.</p>
+        <p class="hint">Los territorios provienen de INVENTARIO_TS.xlsx; las participaciones y estatus se consultan en el libro de Google Sheets.</p>
         <button id="refreshData" class="secondary" type="button">Actualizar datos</button>
-        <div id="bookStatus" class="status">Conectando con el archivo de datos…</div>
+        <div id="bookStatus" class="status">Conectando con Google Sheets…</div>
         <span id="count" class="pill">Cargando datos</span>
       </div>
       <div class="section">
@@ -200,22 +200,16 @@
         <div id="selectionStatus" class="status">Ningún marcador seleccionado.</div>
       </div>
       <div class="section">
-        <h2>3. Consultar registro</h2>
-        <p class="hint">Verde significa que hay un check para la fecha, turno y territorio elegidos; rojo significa que no aparece un registro.</p>
-        <div class="filters">
-          <div><label for="year">Año</label><input id="year" type="number" min="2000" max="2100" placeholder="2026"></div>
-          <div><label for="month">Mes</label><select id="month"><option value="">Todos</option></select></div>
-          <div><label for="day">Día</label><select id="day"><option value="">Todos</option></select></div>
-          <div><label for="shift">Turno</label><select id="shift"><option value="">Todos</option></select></div>
-        </div>
-        <div id="recordStatus" class="status">Cargando datos publicados…</div>
+        <h2>3. Semáforo del territorio</h2>
+        <p class="hint">Se usa la respuesta más reciente a la pregunta sobre riesgo inminente. Sí = rojo intermitente; No = verde intermitente; sin check = rojo.</p>
+        <div id="recordStatus" class="status">Esperando checks de territorio…</div>
       </div>
       <div class="hint">Las ubicaciones se guardan en este navegador. Usa “Exportar ubicaciones” para guardar una copia en JSON.</div>
       <button id="export" class="secondary" type="button" style="margin-top:8px">Exportar ubicaciones</button>
       <label for="importPins">Importar ubicaciones guardadas</label><input id="importPins" type="file" accept=".json">
     </aside>
     <section class="map-card">
-      <div class="map-top"><h2>Plano general</h2><div style="display:flex;align-items:center;gap:14px"><span class="legend"><span style="color:#d92d20">● Sin registro</span> &nbsp; <span style="color:#159447">● Con registro</span></span><button id="viewToggle" class="secondary" type="button" style="width:auto;min-height:34px;padding:6px 11px">Vista completa</button></div></div>
+      <div class="map-top"><h2>Plano general</h2><div style="display:flex;align-items:center;gap:14px"><span class="legend"><span style="color:#d92d20">● Riesgo inminente / sin check</span> &nbsp; <span style="color:#159447">● Riesgo no inminente</span></span><button id="viewToggle" class="secondary" type="button" style="width:auto;min-height:34px;padding:6px 11px">Vista completa</button></div></div>
       <div class="map-wrap" id="mapWrap">
         <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
         <svg id="overlay" viewBox="0 0 2048 1166" aria-label="Marcadores de ubicación"></svg>
@@ -233,10 +227,12 @@
 (() => {
   const KEY='territorios-seguros-ubicaciones-v1';
   const REPORTS_KEY='territorio-seguro-reportes-v1';
-  const DATA_URL='./datos.xlsx';
+  const INVENTORY_URL='./INVENTARIO_TS.xlsx';
+  // URL del despliegue de Apps Script. Pega aquí la URL /exec al publicar el backend.
+  const GOOGLE_SCRIPT_URL=https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec;
   let dataLoadPromise=null;
   const $=id=>document.getElementById(id);
-  const state={territories:[], territoryRows:[], shifts:[], records:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, pins:[], selected:null, addMode:false, userReports:[]};
+  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, addMode:false, userReports:[]};
   try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
   $('viewToggle').addEventListener('click',()=>{
     const map=$('mapView');
@@ -257,12 +253,12 @@
     for(const [id,key] of [['homeTab','home'],['registerTab','register'],['recordsTab','records'],['mapTab','map'],['summaryTab','summary']])$(id).classList.toggle('active',view===key);
     if(view==='records')renderReports();
     if(view==='home')renderHome();
+    if(view==='map')render();
   }
   const colors={missing:'#d92d20',done:'#159447',unmapped:'#1769aa'};
   try { state.pins=JSON.parse(localStorage.getItem(KEY)||'[]'); } catch { state.pins=[]; }
-  for(let i=1;i<=12;i++) $('month').insertAdjacentHTML('beforeend',`<option value="${i}">${String(i).padStart(2,'0')}</option>`);
-  for(let i=1;i<=31;i++) $('day').insertAdjacentHTML('beforeend',`<option value="${i}">${i}</option>`);
   const norm=v=>String(v??'').trim().replace(/\s+/g,' ');
+  const normalizeKey=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es-MX');
   function save(){localStorage.setItem(KEY,JSON.stringify(state.pins)); render();}
   function persistReports(){try{localStorage.setItem(REPORTS_KEY,JSON.stringify(state.userReports));$('reportFormStatus').textContent='';}catch{$('reportFormStatus').textContent='No se pudo guardar. El almacenamiento del navegador puede estar lleno.';}}
   function renderHome(){ $('homeReportCount').textContent=state.userReports.length; $('homeHighCount').textContent=state.userReports.filter(r=>r.risk==='NOK').length; $('homePinCount').textContent=state.pins.length; }
@@ -304,7 +300,34 @@
   }
   buildMatrix('startMatrix','start',startQuestions);buildMatrix('duringMatrix','during',duringQuestions);
   function setOptions(select,values,prompt){select.innerHTML=`<option value="">${prompt}</option>`+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');}
-  setOptions($('departmentSelect'),departments,'Selecciona un departamento');setOptions($('companySelect'),companies,'Selecciona una compañía');
+  function activeTerritoryRows(){return state.inventoryRows.length?state.inventoryRows:state.territoryRows;}
+  function populateDepartments(){
+    const rows=activeTerritoryRows(),fromFile=[...new Set(rows.map(r=>norm(r.department)).filter(Boolean))],all=[...fromFile,...departments],seen=new Set(),unique=[];
+    for(const d of all){const key=normalizeKey(d);if(!seen.has(key)){seen.add(key);unique.push(d);}}
+    const previous=$('departmentSelect').value;setOptions($('departmentSelect'),unique,'Selecciona un departamento');if(unique.some(d=>normalizeKey(d)===normalizeKey(previous)))$('departmentSelect').value=unique.find(d=>normalizeKey(d)===normalizeKey(previous));
+  }
+  populateDepartments();setOptions($('companySelect'),companies,'Selecciona una compañía');
+  function loadInventoryData(){
+    if(!window.XLSX)return Promise.resolve(false);
+    return fetch(INVENTORY_URL,{cache:'no-store'}).then(async response=>{
+      if(!response.ok)throw new Error(`INVENTARIO_TS.xlsx no está disponible (HTTP ${response.status}).`);
+      const workbook=XLSX.read(await response.arrayBuffer(),{type:'array',cellDates:true});let rowsFound=[];
+      for(const sheetName of workbook.SheetNames){
+        const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:''});
+        for(let hr=0;hr<Math.min(rows.length,30);hr++){
+          const headers=(rows[hr]||[]).map(v=>normalizeKey(v));
+          const deptCol=headers.findIndex(h=>/^(departamento|departments?|depto|area|área)$/.test(h)||h.includes('departamento'));
+          const terrCol=headers.findIndex(h=>/^(territorio|territories|territory)$/.test(h)||h.includes('territorio'));
+          if(deptCol<0||terrCol<0)continue;
+          let currentDepartment='';for(let r=hr+1;r<rows.length;r++){const department=norm(rows[r][deptCol]),territory=norm(rows[r][terrCol]);if(department)currentDepartment=department;if(currentDepartment&&territory)rowsFound.push({department:currentDepartment,territory});}
+          if(rowsFound.length)break;
+        }
+        if(rowsFound.length)break;
+      }
+      if(!rowsFound.length)throw new Error('No encontré encabezados de Departamento y Territorio en INVENTARIO_TS.xlsx.');
+      state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;populateDepartments();updateTerritoryOptions();fillTerritories();$('territoryHint').textContent='Territorios cargados desde INVENTARIO_TS.xlsx.';$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();return true;
+    }).catch(err=>{state.inventoryLoaded=false;populateDepartments();updateTerritoryOptions();$('territoryHint').textContent=`Usando la lista de respaldo: ${err.message}`;return false;});
+  }
   function updateTerritoryOptions(){
     const dept=$('departmentSelect').value, target=$('checkTerritory'), aliases={
       'ASEGURAMIENTO DE CALIDAD':['ASEGURAMIENTO DE CALIDAD','CALIDAD'],
@@ -312,37 +335,44 @@
       'CUARTOS FRIOS':['CUARTOS FRIOS','CUARTOS FRÍOS'],
       'INGENIERIA':['INGENIERIA','INGENIERÍA'], 'LOGISTICA':['LOGISTICA','LOGÍSTICA']
     };
-    const matchSet=(aliases[dept]||[dept]).map(normalizeKey),list=[...new Set(state.territoryRows.filter(r=>matchSet.includes(normalizeKey(r.department))).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
+    const matchSet=(aliases[dept]||[dept]).map(normalizeKey),list=[...new Set(activeTerritoryRows().filter(r=>matchSet.includes(normalizeKey(r.department))).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
     target.disabled=!dept;target.required=!!dept;setOptions(target,list,list.length?'Selecciona tu territorio':(state.loaded?'No hay territorios para este departamento':'Cargando territorios…'));
-    $('territoryHint').textContent=dept&&!list.length&&state.loaded?'No hay territorios asociados en datos.xlsx; verifica la columna de departamento y territorio.':'';
+    if(dept&&!list.length&&state.inventoryLoaded)$('territoryHint').textContent=`No hay territorios asociados a ${dept} en INVENTARIO_TS.xlsx.`;
   }
   function updateEntityFields(){
     const entity=document.querySelector('input[name="entityType"]:checked')?.value||'';
     const plant=entity==='PLANTA',company=entity==='COMPAÑÍA';
-    $('departmentBlock').hidden=!plant;$('companyBlock').hidden=!company;$('territorySelectBlock').hidden=!plant;$('companyTerritoryBlock').hidden=!company;
-    $('departmentSelect').required=plant;$('departmentSelect').disabled=!plant;$('companySelect').required=company;$('companySelect').disabled=!company;
-    $('checkTerritory').required=plant;$('checkTerritory').disabled=true;$('companyTerritory').required=company;$('companyTerritory').disabled=!company;
-    if(!plant){$('departmentSelect').value='';setOptions($('checkTerritory'),[],'Primero selecciona el departamento');}
-    if(!company){$('companySelect').value='';$('companyTerritory').value='';}
-    if(plant)updateTerritoryOptions();
+    const hasEntity=plant||company;
+    $('departmentBlock').hidden=!hasEntity;$('companyBlock').hidden=!company;$('territorySelectBlock').hidden=!hasEntity;
+    $('departmentSelect').required=hasEntity;$('departmentSelect').disabled=!hasEntity;$('companySelect').required=company;$('companySelect').disabled=!company;
+    $('checkTerritory').required=hasEntity;$('checkTerritory').disabled=true;
+    if(!hasEntity){$('departmentSelect').value='';$('companySelect').value='';setOptions($('checkTerritory'),[],'Primero selecciona el departamento');}
+    if(hasEntity)updateTerritoryOptions();
   }
   document.querySelectorAll('input[name="entityType"]').forEach(el=>el.addEventListener('change',updateEntityFields));
   $('departmentSelect').addEventListener('change',updateTerritoryOptions);
+  $('sapNumber').addEventListener('input',ev=>{ev.currentTarget.value=ev.currentTarget.value.replace(/\D/g,'');});
   document.querySelectorAll('input[name="actionNeeded"]').forEach(el=>el.addEventListener('change',()=>{const yes=document.querySelector('input[name="actionNeeded"]:checked')?.value==='Sí';$('actionDetailsBlock').hidden=!yes;$('actionDetails').required=yes;if(!yes)$('actionDetails').value='';}));
   function resetReportForm(){ $('reportForm').reset();$('reportId').value='';$('reportDate').value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);$('formHeading').textContent='Monitoreo del dueño de territorio';$('saveReport').textContent='Enviar check';$('cancelEdit').hidden=true;$('actionDetailsBlock').hidden=true;$('actionDetails').required=false;updateEntityFields(); }
   function editReport(id){
     const r=state.userReports.find(x=>x.id===id);if(!r)return;resetReportForm();showView('register');$('reportId').value=r.id;$('sapNumber').value=r.sap||'';$('ownerName').value=r.owner||'';$('reportDate').value=r.date||'';$('reportShift').value=r.shift||'';
     const entity=r.entityType||'PLANTA',radio=document.querySelector(`input[name="entityType"][value="${CSS.escape(entity)}"]`);if(radio)radio.checked=true;updateEntityFields();
-    if(entity==='PLANTA'){$('departmentSelect').value=r.department||'';updateTerritoryOptions();$('checkTerritory').value=r.area||'';}else{$('companySelect').value=r.company||'';$('companyTerritory').value=r.area||'';}
+    $('departmentSelect').value=r.department||'';if(entity==='COMPAÑÍA')$('companySelect').value=r.company||'';updateTerritoryOptions();$('checkTerritory').value=r.area||'';
     for(const [name,value] of Object.entries(r.answers||{})){const input=document.querySelector(`input[name="${CSS.escape(name)}"][value="${CSS.escape(value)}"]`);if(input)input.checked=true;}
     const action=document.querySelector(`input[name="actionNeeded"][value="${CSS.escape(r.actionNeeded||'No')}"]`);if(action)action.checked=true;const yes=r.actionNeeded==='Sí';$('actionDetailsBlock').hidden=!yes;$('actionDetails').required=yes;$('actionDetails').value=r.actionDetails||'';$('formHeading').textContent='Editar monitoreo de territorio';$('saveReport').textContent='Guardar cambios';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'});
+    const risk=document.querySelector(`input[name="imminentRisk"][value="${CSS.escape(r.imminentRisk||'')}"]`);if(risk)risk.checked=true;
   }
-  $('reportForm').addEventListener('submit',ev=>{
-    ev.preventDefault();const id=$('reportId').value,old=state.userReports.find(r=>r.id===id),entityType=document.querySelector('input[name="entityType"]:checked')?.value||'',department=entityType==='PLANTA'?$ ('departmentSelect').value:'',company=entityType==='COMPAÑÍA'?$ ('companySelect').value:'',area=entityType==='PLANTA'?$ ('checkTerritory').value:$ ('companyTerritory').value.trim(),answers={};
+  $('reportForm').addEventListener('submit',async ev=>{
+    ev.preventDefault();const id=$('reportId').value,old=state.userReports.find(r=>r.id===id),entityType=document.querySelector('input[name="entityType"]:checked')?.value||'',department=$('departmentSelect').value,company=entityType==='COMPAÑÍA'?$('companySelect').value:'',area=$('checkTerritory').value,answers={};
     [...startQuestions.map((_,i)=>`start_${i+1}`),...duringQuestions.map((_,i)=>`during_${i+1}`)].forEach(name=>{answers[name]=document.querySelector(`input[name="${name}"]:checked`)?.value||'';});
-    const result=Object.values(answers).includes('NOK')?'NOK':'OK',actionNeeded=document.querySelector('input[name="actionNeeded"]:checked')?.value||'No',actionDetails=actionNeeded==='Sí'?$ ('actionDetails').value.trim():'',description=`Resultado ${result} (${Object.values(answers).filter(x=>x==='NOK').length} NOK de ${Object.keys(answers).length}).${actionDetails?' Acción: '+actionDetails:''}`;
-    const report={id:id||crypto.randomUUID(),type:'Monitoreo de territorio',sap:$('sapNumber').value,owner:$('ownerName').value.trim(),date:$('reportDate').value,shift:$('reportShift').value,entityType,department,company,area,risk:result,status:actionNeeded==='Sí'?'En seguimiento':'Sin acción',description,answers,actionNeeded,actionDetails,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
-    if(old)state.userReports=state.userReports.map(r=>r.id===id?report:r);else state.userReports.push(report);persistReports();resetReportForm();showView('records');
+    const result=Object.values(answers).includes('NOK')?'NOK':'OK',actionNeeded=document.querySelector('input[name="actionNeeded"]:checked')?.value||'No',rawAction=actionNeeded==='Sí'?$('actionDetails').value.trim().replace(/^#TS\s*/i,''):'',actionDetails=rawAction?`#TS ${rawAction}`:'',imminentRisk=document.querySelector('input[name="imminentRisk"]:checked')?.value||'',description=`Resultado ${result} (${Object.values(answers).filter(x=>x==='NOK').length} NOK de ${Object.keys(answers).length}). Riesgo inminente: ${imminentRisk}.${actionDetails?' Acción: '+actionDetails:''}`;
+    const report={id:id||crypto.randomUUID(),type:'Monitoreo de territorio',sap:$('sapNumber').value,owner:$('ownerName').value.trim(),date:$('reportDate').value,shift:$('reportShift').value,entityType,department,company,area,risk:result,imminentRisk,status:actionNeeded==='Sí'?'En seguimiento':'Sin acción',description,answers,actionNeeded,actionDetails,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+    if(!GOOGLE_SCRIPT_URL.startsWith('https://script.google.com/macros/s/')){$('reportFormStatus').textContent='Falta configurar la URL del Apps Script de Google Sheets. El check no se envió.';return;}
+    const button=$('saveReport');button.disabled=true;$('reportFormStatus').textContent='Enviando respuesta a Google Sheets…';
+    try{
+      await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'submit',report})});
+      if(old)state.userReports=state.userReports.map(r=>r.id===id?report:r);else state.userReports.push(report);persistReports();$('reportFormStatus').textContent='Respuesta enviada. Actualizando estatus desde Google Sheets…';await loadPublicData();render();resetReportForm();showView('records');
+    }catch(err){$('reportFormStatus').textContent=`No se pudo enviar a Google Sheets: ${err.message}`;}finally{button.disabled=false;}
   });
   $('cancelEdit').addEventListener('click',resetReportForm);
   $('newReport').addEventListener('click',()=>{resetReportForm();showView('register');});
@@ -359,46 +389,25 @@
     m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return [+m[1],+m[2],+m[3]];
     return null;
   }
+  function jsonp(url){return new Promise((resolve,reject)=>{const callback='tsCallback_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script'),timer=setTimeout(()=>finish(new Error('Tiempo de espera agotado al consultar Google Sheets.')),20000);function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}window[callback]=value=>finish(null,value);script.onerror=()=>finish(new Error('No se pudo consultar el servicio de Google Sheets.'));script.src=`${url}${url.includes('?')?'&':'?'}callback=${callback}&_=${Date.now()}`;document.head.appendChild(script);});}
   async function loadPublicData(){
     if(dataLoadPromise)return dataLoadPromise;
     dataLoadPromise=(async()=>{
-      $('bookStatus').textContent='Descargando datos.xlsx desde GitHub…';
+      $('bookStatus').textContent='Consultando participaciones en Google Sheets…';
       $('refreshData').disabled=true;
       try{
-        if(!window.XLSX)throw new Error('No se pudo cargar el lector de Excel. Revisa la conexión a internet.');
-        const response=await fetch(DATA_URL,{cache:'no-cache'});
-        if(!response.ok)throw new Error(`No se pudo obtener datos.xlsx (HTTP ${response.status}). Revisa que esté en la raíz del repositorio.`);
-        const wb=XLSX.read(await response.arrayBuffer(),{type:'array',cellDates:true});
-        const dash=wb.Sheets['Territorio Safety'],raw=wb.Sheets['Sheet1'];
-        if(!dash||!raw)throw new Error('El libro debe contener las hojas “Sheet1” y “Territorio Safety”.');
-        const territoryRows=[],territories=[];
-        for(let r=8;r<=150;r++){
-          const get=c=>dash[XLSX.utils.encode_cell({r,c})]?.v,territory=norm(get(2));
-          if(territory){territoryRows.push({line:norm(get(0)),department:norm(get(1)),territory});if(!territories.includes(territory))territories.push(territory);}
-        }
-        if(!territories.length)throw new Error('No hay territorios en “Territorio Safety”, columna C, filas 9 a 151.');
-        const shifts=new Set(),records=[],sheetRange=XLSX.utils.decode_range(raw['!ref']||'A1');
-        for(let r=1;r<=sheetRange.e.r;r++){
-          const dateCell=raw[XLSX.utils.encode_cell({r,c:8})],shift=norm(raw[XLSX.utils.encode_cell({r,c:9})]?.v),territory=norm(raw[XLSX.utils.encode_cell({r,c:64})]?.v);
-          const parts=dateParts(dateCell?.v,dateCell);if(!parts)continue;
-          if(shift)shifts.add(shift);
-          if(territory)records.push({year:parts[0],month:parts[1],day:parts[2],shift,territory});
-        }
-        state.territoryRows=territoryRows;
-        state.territories=territories;
-        state.records=records;
-        state.shifts=[...shifts].sort((a,b)=>a.localeCompare(b,'es'));
-        state.loaded=true;
-        fillTerritories();fillShifts();updateTerritoryOptions();
-        $('count').textContent=`${state.territories.length} territorios · ${state.records.length.toLocaleString('es-MX')} registros`;
-        const lastModified=response.headers.get('last-modified'),updated=lastModified?new Date(lastModified).toLocaleString('es-MX'):new Date().toLocaleString('es-MX');
-        $('bookStatus').textContent=`Libro leído: ${updated}.`;
-        $('recordStatus').textContent='Filtros listos; los marcadores se actualizan automáticamente.';
+        if(!GOOGLE_SCRIPT_URL.startsWith('https://script.google.com/macros/s/'))throw new Error('Conexión pendiente: falta pegar la URL /exec del Apps Script.');
+        const payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=read`);if(!payload||payload.ok!==true)throw new Error(payload?.error||'Google Sheets no devolvió datos.');
+        const records=(payload.records||[]).map(r=>{const parts=dateParts(r.date);return parts&&r.territory?{year:parts[0],month:parts[1],day:parts[2],shift:norm(r.shift),territory:norm(r.territory)}:null;}).filter(Boolean);
+        state.records=records;state.googleChecks=payload.statuses||[];state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
+        $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas en Google Sheets`;
+        $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
+        $('recordStatus').textContent='Participaciones y estatus leídos desde Google Sheets; consulta automática cada minuto.';
         render();updateSummary();
       }catch(err){
         $('bookStatus').textContent=`No se pudieron cargar los datos: ${err.message}`;
         $('count').textContent='Datos no disponibles';
-        $('recordStatus').textContent='Revisa que datos.xlsx esté publicado junto a index.html.';
+        $('recordStatus').textContent='Verifica el despliegue de Apps Script y que su acceso permita lectura pública.';
       }finally{$('refreshData').disabled=false;dataLoadPromise=null;}
     })();
     return dataLoadPromise;
@@ -407,7 +416,6 @@
     const s=$('territory'); s.innerHTML='<option value="">Selecciona un territorio</option>'+state.territories.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
     s.disabled=!state.selected;
   }
-  function fillShifts(){ $('shift').innerHTML='<option value="">Todos</option>'+state.shifts.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join(''); }
   function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function selectedPin(){return state.pins.find(p=>p.id===state.selected);}
   function syncEditor(){
@@ -418,9 +426,9 @@
     $('selectionStatus').textContent=p?`Editando ${p.name||'marcador'}${p.territory?' · '+p.territory:''}.`:'Ningún marcador seleccionado.';
   }
   function checkStatus(territory){
-    if(!territory || !state.loaded) return null;
-    const year=$('year').value, month=$('month').value, day=$('day').value, shift=$('shift').value;
-    return state.records.some(r=>r.territory===territory && (!year||r.year===+year) && (!month||r.month===+month) && (!day||r.day===+day) && (!shift||r.shift===shift));
+    if(!territory)return false;
+    const checks=state.googleChecks.filter(r=>normalizeKey(r.territory)===normalizeKey(territory)).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.timestamp).localeCompare(String(a.timestamp)));
+    return checks.length?String(checks[0].imminentRisk).toLocaleLowerCase('es-MX')==='no':false;
   }
   function render(){
     const svg=$('overlay'); svg.innerHTML='';
@@ -432,7 +440,7 @@
       g.append(c,t); g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;state.addMode=false;$('addMode').textContent='Agregar ubicación en el plano';syncEditor();render();}); svg.append(g);
     }
     $('mapWrap').style.cursor=state.addMode?'crosshair':'default';
-    $('mapMessage').textContent=state.pins.length?`${state.pins.length} ubicación(es) marcada(s). Verde intermitente = hay registro con los filtros actuales; rojo intermitente = no hay registro. Los filtros vacíos incluyen todos sus valores.`:'Agrega una ubicación y asígnale un territorio. Los datos del panel se actualizan desde el archivo publicado.';
+    $('mapMessage').textContent=state.pins.length?`${state.pins.length} ubicación(es) marcada(s). Verde intermitente = el check más reciente indica que el riesgo no es inminente; rojo intermitente = riesgo inminente o falta de check.`:'Agrega una ubicación y asígnale un territorio. Los marcadores se actualizan con el riesgo indicado en el check más reciente.';
   }
   const weekdays=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
   const turnNames=['Primer turno','Segundo turno','Tercer turno'];
@@ -440,7 +448,6 @@
   const dayNames=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
   const weeklyAreaOrder=['Cocimientos','Cuartos Frios','Ingenieria','L02','L12','L10','Patrimonial','L05','Calidad','L11','L07','S&E','Logistica','Tapanco','L09','L04','Periferico','L06','Mtto Env','Ambiental','L03'];
   const d1AreaOrder=['Cocimientos','Cuartos Frios','Ingenieria','Patrimonial','Periferico','S&E','L04','L09','L11','L05','Ambiental','Calidad','Logistica','L07','L02','L12','L06','L03','Mtto Env','L10','Tapanco'];
-  function normalizeKey(v){return norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es-MX');}
   function sortAreas(areas,reference){
     const order=new Map(reference.map((v,i)=>[normalizeKey(v),i]));
     return [...areas].sort((a,b)=>(order.get(normalizeKey(a))??999)-(order.get(normalizeKey(b))??999)||a.localeCompare(b,'es'));
@@ -593,15 +600,14 @@
   $('territory').addEventListener('change',e=>{const p=selectedPin();if(p){p.territory=e.target.value; if(p.territory && /^Ubicación \d+$/.test(p.name))p.name=p.territory;save();syncEditor();}});
   $('pinName').addEventListener('input',e=>{const p=selectedPin();if(p){p.name=e.target.value;save();}});
   $('deletePin').addEventListener('click',()=>{state.pins=state.pins.filter(p=>p.id!==state.selected);state.selected=null;save();syncEditor();});
-  for(const id of ['year','month','day','shift']) for(const eventName of ['input','change']) $(id).addEventListener(eventName,()=>{ $('recordStatus').textContent='Marcadores actualizados automáticamente con los filtros actuales.';render();});
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   $('importPins').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data))throw Error();state.pins=data;state.selected=null;save();syncEditor();}catch{$('selectionStatus').textContent='El archivo de ubicaciones no tiene un formato válido.';}});
-  $('refreshData').addEventListener('click',loadPublicData);
+  $('refreshData').addEventListener('click',()=>{loadPublicData();loadInventoryData();});
   fillTerritories(); syncEditor(); render();resetReportForm();renderReports();showView('home');
+  loadInventoryData();
   loadPublicData();
-  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},300000);
+  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},60000);
 })();
 </script>
 </body>
 </html>
-
