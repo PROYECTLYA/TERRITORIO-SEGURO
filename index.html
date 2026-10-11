@@ -584,10 +584,15 @@
     const button=$('saveSemaphore');button.disabled=true;button.textContent='Guardando…';
     let pin;
     if(draft.mode==='move'){
-      pin=state.pins.find(item=>item.id===draft.pinId);if(!pin){button.disabled=false;return;}pin.x=draft.x;pin.y=draft.y;
-    }else {pin={id:crypto.randomUUID(),x:draft.x,y:draft.y,department:draft.department,territory:draft.territory,name:draft.territory};state.pins.push(pin);}
-    try{await postShared({action:'saveLocation',location:pin});const refreshed=await refreshSharedData(()=>state.pins.some(item=>locationMatches(item,pin)&&Number(item.x)===Number(pin.x)&&Number(item.y)===Number(pin.y)));if(!refreshed)throw new Error('El Apps Script no confirmó la ubicación. Vuelve a desplegar Code.gs.');localStorage.setItem(KEY,JSON.stringify(state.pins));state.selected=null;renderTerritoryList();renderHome();resetLocationFlow();}
-    catch(err){button.disabled=false;button.textContent=draft.mode==='move'?'Guardar nueva ubicación':'Guardar ubicación';$('locationStatus').textContent=`No se pudo guardar la ubicación compartida: ${err.message}`;}
+      const current=state.pins.find(item=>item.id===draft.pinId);if(!current){button.disabled=false;button.textContent='Guardar nueva ubicación';return;}pin={...current,x:draft.x,y:draft.y};
+    }else pin={id:crypto.randomUUID(),x:draft.x,y:draft.y,department:draft.department,territory:draft.territory,name:draft.territory};
+    try{
+      await postShared({action:'saveLocation',location:pin});
+      const matchesSavedPosition=()=>state.pins.some(item=>locationMatches(item,pin)&&Math.abs(Number(item.x)-Number(pin.x))<1e-6&&Math.abs(Number(item.y)-Number(pin.y))<1e-6);
+      const refreshed=await refreshSharedData(matchesSavedPosition);
+      if(!refreshed)throw new Error('La ubicación no apareció en la consulta compartida. Verifica que el despliegue activo de Code.gs incluya la acción saveLocation y tenga permiso para editar la hoja.');
+      localStorage.setItem(KEY,JSON.stringify(state.pins));state.selected=null;renderTerritoryList();renderHome();resetLocationFlow();
+    }catch(err){button.disabled=false;button.textContent=draft.mode==='move'?'Guardar nueva ubicación':'Guardar ubicación';$('locationStatus').textContent=`No se pudo guardar la ubicación compartida: ${err.message}`;render();}
   });
   $('cancelSemaphore').addEventListener('click',resetLocationFlow);
   $('cancelPlacement').addEventListener('click',resetLocationFlow);
