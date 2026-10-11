@@ -132,6 +132,7 @@
     .check-form input[type=text],.check-form input[type=date],.check-form input[type=number],.check-form select,.check-form textarea { width:100%; min-height:42px; border:1px solid #c8d2de; border-radius:7px; padding:9px 11px; color:var(--ink); font:inherit }
     .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px }
     .field-block { display:grid; gap:6px; margin:10px 0 }
+    .field-block[hidden] { display:none !important }
     .field-title { font-weight:650; font-size:14px }
     .choice-row { display:flex; flex-wrap:wrap; gap:9px 22px; padding:7px 0 }
     .choice-row label { display:flex; align-items:center; gap:8px; font-weight:400 }
@@ -269,7 +270,6 @@
     $('reportsList').innerHTML=rows.length?rows.map(r=>`<article class="report-item"><div><div class="report-title">${esc(r.owner||'Sin nombre')} · ${esc(r.area||'Sin territorio')} <span class="risk-chip ${r.risk==='OK'?'low':''}">${esc(r.risk||'')}</span></div><div class="report-meta">SAP ${esc(r.sap||'—')} · ${esc(r.department||r.company||'')} · ${esc(r.date||'')}${r.shift?' · '+esc(r.shift):''} · ${esc(r.status||'')}</div><p class="report-description">${esc(r.description||'')}</p></div><div class="report-actions"><button type="button" class="secondary" data-edit-report="${esc(r.id)}">Editar</button><button type="button" class="secondary" data-delete-report="${esc(r.id)}">Eliminar</button></div></article>`).join(''):'<div class="empty-reports">No hay checks que coincidan con la búsqueda.</div>';
     renderHome();
   }
-  const departments=['ASEGURAMIENTO DE CALIDAD','COCIMIENTOS','CUARTOS FRIOS','ENVASADO','GENTE','INGENIERIA','LABORATORIO CENTRAL','LOGISTICA','PROTECCIÓN PATRIMONIAL','S&E','TRATAMIENTO DE AGUAS'];
   const companies=['GEGSA','FORROS TERMICOS','EXSAN','MMEEPI','SONORA','CARBETOS','TOCALO','LMX','NALCO','REDIPSA','ECOLAB','CHEAMTREAT','SERVICIOS ESPECIALIZADOS','FAMDEA'];
   const startQuestions=[
     '¿Los integrantes de tu equipo (primera línea), entregan-reciben su territorio libre de peligros?',
@@ -300,15 +300,17 @@
   }
   buildMatrix('startMatrix','start',startQuestions);buildMatrix('duringMatrix','during',duringQuestions);
   function setOptions(select,values,prompt){select.innerHTML=`<option value="">${prompt}</option>`+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');}
-  function activeTerritoryRows(){return state.inventoryRows.length?state.inventoryRows:state.territoryRows;}
+  function activeTerritoryRows(){return state.inventoryRows;}
   function populateDepartments(){
-    const rows=activeTerritoryRows(),fromFile=[...new Set(rows.map(r=>norm(r.department)).filter(Boolean))],all=[...fromFile,...departments],seen=new Set(),unique=[];
-    for(const d of all){const key=normalizeKey(d);if(!seen.has(key)){seen.add(key);unique.push(d);}}
-    const previous=$('departmentSelect').value;setOptions($('departmentSelect'),unique,'Selecciona un departamento');if(unique.some(d=>normalizeKey(d)===normalizeKey(previous)))$('departmentSelect').value=unique.find(d=>normalizeKey(d)===normalizeKey(previous));
+    const rows=activeTerritoryRows(),unique=[...new Set(rows.map(r=>norm(r.department)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+    const previous=$('departmentSelect').value;setOptions($('departmentSelect'),unique,state.inventoryLoaded?'Selecciona un departamento':'Cargando departamentos…');
+    $('departmentSelect').disabled=!state.inventoryLoaded||!document.querySelector('input[name="entityType"]:checked');
+    if(unique.some(d=>normalizeKey(d)===normalizeKey(previous)))$('departmentSelect').value=unique.find(d=>normalizeKey(d)===normalizeKey(previous));
+    else $('departmentSelect').value='';
   }
   populateDepartments();setOptions($('companySelect'),companies,'Selecciona una compañía');
   function loadInventoryData(){
-    if(!window.XLSX)return Promise.resolve(false);
+    if(!window.XLSX){setOptions($('departmentSelect'),[],'No disponible: revisa INVENTARIO_TS.xlsx');$('departmentSelect').disabled=true;$('territoryHint').textContent='No se pudo iniciar la lectura de INVENTARIO_TS.xlsx.';return Promise.resolve(false);}
     return fetch(INVENTORY_URL,{cache:'no-store'}).then(async response=>{
       if(!response.ok)throw new Error(`INVENTARIO_TS.xlsx no está disponible (HTTP ${response.status}).`);
       const workbook=XLSX.read(await response.arrayBuffer(),{type:'array',cellDates:true});let rowsFound=[];
@@ -326,17 +328,12 @@
       }
       if(!rowsFound.length)throw new Error('No encontré encabezados de Departamento y Territorio en INVENTARIO_TS.xlsx.');
       state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;populateDepartments();updateTerritoryOptions();fillTerritories();$('territoryHint').textContent='Territorios cargados desde INVENTARIO_TS.xlsx.';$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();return true;
-    }).catch(err=>{state.inventoryLoaded=false;populateDepartments();updateTerritoryOptions();$('territoryHint').textContent=`Usando la lista de respaldo: ${err.message}`;return false;});
+    }).catch(err=>{state.inventoryLoaded=false;state.inventoryRows=[];state.territories=[];state.territoryRows=[];populateDepartments();setOptions($('departmentSelect'),[],'No disponible: revisa INVENTARIO_TS.xlsx');$('departmentSelect').disabled=true;updateTerritoryOptions();fillTerritories();$('territoryHint').textContent=`No se pudieron cargar departamentos y territorios desde INVENTARIO_TS.xlsx: ${err.message}`;$('count').textContent='Inventario no disponible';render();return false;});
   }
   function updateTerritoryOptions(){
-    const dept=$('departmentSelect').value, target=$('checkTerritory'), aliases={
-      'ASEGURAMIENTO DE CALIDAD':['ASEGURAMIENTO DE CALIDAD','CALIDAD'],
-      'PROTECCIÓN PATRIMONIAL':['PROTECCIÓN PATRIMONIAL','PATRIMONIAL'],
-      'CUARTOS FRIOS':['CUARTOS FRIOS','CUARTOS FRÍOS'],
-      'INGENIERIA':['INGENIERIA','INGENIERÍA'], 'LOGISTICA':['LOGISTICA','LOGÍSTICA']
-    };
-    const matchSet=(aliases[dept]||[dept]).map(normalizeKey),list=[...new Set(activeTerritoryRows().filter(r=>matchSet.includes(normalizeKey(r.department))).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
-    target.disabled=!dept;target.required=!!dept;setOptions(target,list,list.length?'Selecciona tu territorio':(state.loaded?'No hay territorios para este departamento':'Cargando territorios…'));
+    const dept=$('departmentSelect').value, target=$('checkTerritory');
+    const list=[...new Set(activeTerritoryRows().filter(r=>normalizeKey(r.department)===normalizeKey(dept)).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
+    target.disabled=!state.inventoryLoaded||!dept;target.required=!!dept;setOptions(target,list,list.length?'Selecciona tu territorio':(state.inventoryLoaded?'No hay territorios para este departamento':'Cargando territorios…'));
     if(dept&&!list.length&&state.inventoryLoaded)$('territoryHint').textContent=`No hay territorios asociados a ${dept} en INVENTARIO_TS.xlsx.`;
   }
   function updateEntityFields(){
@@ -344,7 +341,7 @@
     const plant=entity==='PLANTA',company=entity==='COMPAÑÍA';
     const hasEntity=plant||company;
     $('departmentBlock').hidden=!hasEntity;$('companyBlock').hidden=!company;$('territorySelectBlock').hidden=!hasEntity;
-    $('departmentSelect').required=hasEntity;$('departmentSelect').disabled=!hasEntity;$('companySelect').required=company;$('companySelect').disabled=!company;
+    $('departmentSelect').required=hasEntity;$('departmentSelect').disabled=!hasEntity||!state.inventoryLoaded;$('companySelect').required=company;$('companySelect').disabled=!company;
     $('checkTerritory').required=hasEntity;$('checkTerritory').disabled=true;
     if(!hasEntity){$('departmentSelect').value='';$('companySelect').value='';setOptions($('checkTerritory'),[],'Primero selecciona el departamento');}
     if(hasEntity)updateTerritoryOptions();
@@ -352,14 +349,21 @@
   document.querySelectorAll('input[name="entityType"]').forEach(el=>el.addEventListener('change',updateEntityFields));
   $('departmentSelect').addEventListener('change',updateTerritoryOptions);
   $('sapNumber').addEventListener('input',ev=>{ev.currentTarget.value=ev.currentTarget.value.replace(/\D/g,'');});
-  document.querySelectorAll('input[name="actionNeeded"]').forEach(el=>el.addEventListener('change',()=>{const yes=document.querySelector('input[name="actionNeeded"]:checked')?.value==='Sí';$('actionDetailsBlock').hidden=!yes;$('actionDetails').required=yes;if(!yes)$('actionDetails').value='';}));
-  function resetReportForm(){ $('reportForm').reset();$('reportId').value='';$('reportDate').value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);$('formHeading').textContent='Monitoreo del dueño de territorio';$('saveReport').textContent='Enviar check';$('cancelEdit').hidden=true;$('actionDetailsBlock').hidden=true;$('actionDetails').required=false;updateEntityFields(); }
+  function setActionDetailsVisibility(visible){
+    $('actionDetailsBlock').hidden=!visible;
+    $('actionDetails').required=visible;
+    if(!visible)$('actionDetails').value='';
+  }
+  document.querySelectorAll('input[name="actionNeeded"]').forEach(el=>el.addEventListener('change',()=>{
+    setActionDetailsVisibility(document.querySelector('input[name="actionNeeded"]:checked')?.value==='Sí');
+  }));
+  function resetReportForm(){ $('reportForm').reset();$('reportId').value='';$('reportDate').value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);$('formHeading').textContent='Monitoreo del dueño de territorio';$('saveReport').textContent='Enviar check';$('cancelEdit').hidden=true;setActionDetailsVisibility(false);updateEntityFields(); }
   function editReport(id){
     const r=state.userReports.find(x=>x.id===id);if(!r)return;resetReportForm();showView('register');$('reportId').value=r.id;$('sapNumber').value=r.sap||'';$('ownerName').value=r.owner||'';$('reportDate').value=r.date||'';$('reportShift').value=r.shift||'';
     const entity=r.entityType||'PLANTA',radio=document.querySelector(`input[name="entityType"][value="${CSS.escape(entity)}"]`);if(radio)radio.checked=true;updateEntityFields();
     $('departmentSelect').value=r.department||'';if(entity==='COMPAÑÍA')$('companySelect').value=r.company||'';updateTerritoryOptions();$('checkTerritory').value=r.area||'';
     for(const [name,value] of Object.entries(r.answers||{})){const input=document.querySelector(`input[name="${CSS.escape(name)}"][value="${CSS.escape(value)}"]`);if(input)input.checked=true;}
-    const action=document.querySelector(`input[name="actionNeeded"][value="${CSS.escape(r.actionNeeded||'No')}"]`);if(action)action.checked=true;const yes=r.actionNeeded==='Sí';$('actionDetailsBlock').hidden=!yes;$('actionDetails').required=yes;$('actionDetails').value=r.actionDetails||'';$('formHeading').textContent='Editar monitoreo de territorio';$('saveReport').textContent='Guardar cambios';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'});
+    const action=document.querySelector(`input[name="actionNeeded"][value="${CSS.escape(r.actionNeeded||'No')}"]`);if(action)action.checked=true;const yes=r.actionNeeded==='Sí';setActionDetailsVisibility(yes);$('actionDetails').value=yes?(r.actionDetails||''):'';$('formHeading').textContent='Editar monitoreo de territorio';$('saveReport').textContent='Guardar cambios';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'});
     const risk=document.querySelector(`input[name="imminentRisk"][value="${CSS.escape(r.imminentRisk||'')}"]`);if(risk)risk.checked=true;
   }
   $('reportForm').addEventListener('submit',async ev=>{
