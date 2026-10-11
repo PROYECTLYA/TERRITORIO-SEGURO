@@ -144,6 +144,11 @@
     .report-title { font-weight:700 }
     .report-meta { color:var(--muted); font-size:12px; margin-top:4px }
     .report-description { margin:8px 0 0; white-space:pre-wrap; overflow-wrap:anywhere }
+    .report-answers { margin-top:10px; color:#344054 }
+    .report-answers summary { cursor:pointer; font-weight:700 }
+    .report-answers ol { padding-left:22px }
+    .report-answers li { padding:4px 0 }
+    .report-answers li strong { margin-left:8px }
     .report-actions { display:flex; gap:6px }
     .report-actions button { width:auto; min-height:32px; padding:5px 9px; font-size:12px }
     .risk-chip { display:inline-block; border-radius:20px; padding:3px 8px; font-size:12px; font-weight:700; background:#fff1f0; color:#bd2b24 }
@@ -249,13 +254,17 @@
 (() => {
   const KEY='territorios-seguros-ubicaciones-v1';
   const REPORTS_KEY='territorio-seguro-reportes-v1';
+  const OWNED_REPORTS_KEY='territorio-seguro-reportes-propios-v1';
   const INVENTORY_URL='https://docs.google.com/spreadsheets/d/1vr3wyGQm6tsfP0mmg_dz_n6n5tCWa7VAj2YN8YK-3ts/gviz/tq';
   // URL de la aplicación web de Apps Script desplegada para este proyecto.
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
   let dataLoadPromise=null,inventoryLoadPromise=null;
   const $=id=>document.getElementById(id);
-  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[]};
+  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
   try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
+  const hadOwnershipList=localStorage.getItem(OWNED_REPORTS_KEY)!==null;
+  try { const own=JSON.parse(localStorage.getItem(OWNED_REPORTS_KEY)||'null');state.ownedReportIds=new Set(Array.isArray(own)?own:state.userReports.map(r=>r.id).filter(Boolean)); } catch { state.ownedReportIds=new Set(state.userReports.map(r=>r.id).filter(Boolean)); }
+  state.legacyReports=hadOwnershipList?[]:[...state.userReports];
   $('sidebarToggle').addEventListener('click',()=>{
     const full=$('mapView').classList.toggle('full-view');
     $('sidebarToggle').textContent=full?'Mostrar lista':'Ocultar lista';
@@ -278,15 +287,16 @@
   }
   const colors={missing:'#d92d20',done:'#159447',unmapped:'#1769aa'};
   try { state.pins=JSON.parse(localStorage.getItem(KEY)||'[]'); } catch { state.pins=[]; }
+  state.legacyPins=[...state.pins];
   const norm=v=>String(v??'').trim().replace(/\s+/g,' ');
   const normalizeKey=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es-MX');
-  function persistReports(){try{localStorage.setItem(REPORTS_KEY,JSON.stringify(state.userReports));$('reportFormStatus').textContent='';}catch{$('reportFormStatus').textContent='No se pudo guardar. El almacenamiento del navegador puede estar lleno.';}}
+  function persistReports(){try{localStorage.setItem(REPORTS_KEY,JSON.stringify(state.userReports));localStorage.setItem(OWNED_REPORTS_KEY,JSON.stringify([...state.ownedReportIds]));$('reportFormStatus').textContent='';}catch{$('reportFormStatus').textContent='No se pudo guardar la copia local.';}}
   function renderHome(){ $('homeReportCount').textContent=state.userReports.length; $('homeHighCount').textContent=state.userReports.filter(r=>r.risk==='NOK').length; $('homePinCount').textContent=state.pins.length; }
   function renderReports(){
     const query=normalizeKey($('reportSearch').value),risk=$('riskFilter').value,status=$('statusFilter').value;
     const rows=state.userReports.filter(r=>(!risk||r.risk===risk)&&(!status||r.status===status)&&(!query||normalizeKey([r.type,r.area,r.description,r.owner,r.department,r.company,r.sap].join(' ')).includes(query))).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
     $('recordsCount').textContent=`${rows.length} de ${state.userReports.length} reportes`;
-    $('reportsList').innerHTML=rows.length?rows.map(r=>`<article class="report-item"><div><div class="report-title">${esc(r.owner||'Sin nombre')} · ${esc(r.area||'Sin territorio')} <span class="risk-chip ${r.risk==='OK'?'low':''}">${esc(r.risk||'')}</span></div><div class="report-meta">SAP ${esc(r.sap||'—')} · ${esc(r.department||r.company||'')} · ${esc(r.date||'')}${r.shift?' · '+esc(r.shift):''} · ${esc(r.status||'')}</div><p class="report-description">${esc(r.description||'')}</p></div><div class="report-actions"><button type="button" class="secondary" data-edit-report="${esc(r.id)}">Editar</button><button type="button" class="secondary" data-delete-report="${esc(r.id)}">Eliminar</button></div></article>`).join(''):'<div class="empty-reports">No hay checks que coincidan con la búsqueda.</div>';
+    $('reportsList').innerHTML=rows.length?rows.map(r=>{const editable=state.ownedReportIds.has(r.id),questions=[...startQuestions,...duringQuestions],answerEntries=Object.entries(r.answers||{});const answerList=answerEntries.map(([key,value])=>{const match=key.match(/^(start|during)_(\d+)$/);if(!match)return '';const list=match[1]==='start'?startQuestions:duringQuestions,label=list[Number(match[2])-1];return label?`<li><span>${esc(label)}</span><strong>${esc(value||'Sin respuesta')}</strong></li>`:'';}).join('');return `<article class="report-item"><div><div class="report-title">${esc(r.owner||'Sin nombre')} · ${esc(r.area||'Sin territorio')} <span class="risk-chip ${r.risk==='OK'?'low':''}">${esc(r.risk||'')}</span></div><div class="report-meta">SAP ${esc(r.sap||'—')} · ${esc(r.department||r.company||'')} · ${esc(r.date||'')}${r.shift?' · '+esc(r.shift):''} · ${esc(r.status||'')}</div><p class="report-description">${esc(r.description||'')}</p>${answerList?`<details class="report-answers"><summary>Ver respuestas del check (${questions.length})</summary><ol>${answerList}</ol></details>`:''}</div>${editable?`<div class="report-actions"><button type="button" class="secondary" data-edit-report="${esc(r.id)}">Editar</button></div>`:''}</article>`;}).join(''):'<div class="empty-reports">No hay checks que coincidan con la búsqueda.</div>';
     renderHome();
   }
   const companies=['GEGSA','FORROS TERMICOS','EXSAN','MMEEPI','SONORA','CARBETOS','TOCALO','LMX','NALCO','REDIPSA','ECOLAB','CHEAMTREAT','SERVICIOS ESPECIALIZADOS','FAMDEA'];
@@ -354,6 +364,7 @@
         if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió pares de Departamento y Territorio en las columnas A y C.');
         state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
         state.pins=state.pins.map(p=>p.department?p:{...p,department:rowsFound.find(r=>normalizeKey(r.territory)===normalizeKey(p.territory))?.department||''});localStorage.setItem(KEY,JSON.stringify(state.pins));
+        state.legacyPins=state.legacyPins.map(p=>p.department?p:{...p,department:rowsFound.find(r=>normalizeKey(r.territory)===normalizeKey(p.territory))?.department||''});
         populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();$('territoryHint').textContent='Departamentos y territorios actualizados desde Google Sheets · hoja INVENTARIO.';$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();return true;
       }catch(err){
         if(!state.inventoryLoaded){state.inventoryRows=[];state.territories=[];state.territoryRows=[];populateDepartments();populateLocationDepartments();setOptions($('departmentSelect'),[],'No disponible: revisa la hoja INVENTARIO');$('departmentSelect').disabled=true;updateTerritoryOptions();$('count').textContent='Inventario no disponible';render();}
@@ -406,14 +417,14 @@
     if(!GOOGLE_SCRIPT_URL.startsWith('https://script.google.com/macros/s/')){$('reportFormStatus').textContent='Falta configurar la URL del Apps Script de Google Sheets. El check no se envió.';return;}
     const button=$('saveReport');button.disabled=true;$('reportFormStatus').textContent='Enviando respuesta a Google Sheets…';
     try{
-      await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'submit',report})});
-      if(old)state.userReports=state.userReports.map(r=>r.id===id?report:r);else state.userReports.push(report);persistReports();$('reportFormStatus').textContent='Respuesta enviada. Actualizando estatus desde Google Sheets…';await loadPublicData();render();resetReportForm();showView('records');
+      await postShared({action:'submit',report});
+      state.ownedReportIds.add(report.id);$('reportFormStatus').textContent='Respuesta enviada. Actualizando registros compartidos…';const refreshed=await refreshSharedData();if(!refreshed||!state.userReports.some(r=>String(r.id)===String(report.id)))throw new Error('El Apps Script no confirmó el guardado. Verifica que desplegaste la versión nueva.');render();resetReportForm();showView('records');
     }catch(err){$('reportFormStatus').textContent=`No se pudo enviar a Google Sheets: ${err.message}`;}finally{button.disabled=false;}
   });
   $('cancelEdit').addEventListener('click',resetReportForm);
   $('newReport').addEventListener('click',()=>{resetReportForm();showView('register');});
   for(const id of ['reportSearch','riskFilter','statusFilter'])$(id).addEventListener('input',renderReports),$(id).addEventListener('change',renderReports);
-  $('reportsList').addEventListener('click',ev=>{const edit=ev.target.closest('[data-edit-report]'),del=ev.target.closest('[data-delete-report]');if(edit)editReport(edit.dataset.editReport);if(del&&confirm('¿Eliminar este reporte? Esta acción no se puede deshacer.')){state.userReports=state.userReports.filter(r=>r.id!==del.dataset.deleteReport);persistReports();renderReports();}});
+  $('reportsList').addEventListener('click',ev=>{const edit=ev.target.closest('[data-edit-report]');if(edit)editReport(edit.dataset.editReport);});
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.view==='register')resetReportForm();showView(b.dataset.view);}));
   $('exportReports').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.userReports,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='territorio-seguro-reportes.json';a.click();URL.revokeObjectURL(a.href);});
   function dateParts(v, cell){
@@ -426,27 +437,45 @@
     return null;
   }
   function jsonp(url){return new Promise((resolve,reject)=>{const callback='tsCallback_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script'),timer=setTimeout(()=>finish(new Error('Tiempo de espera agotado al consultar Google Sheets.')),20000);function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}window[callback]=value=>finish(null,value);script.onerror=()=>finish(new Error('No se pudo consultar el servicio de Google Sheets.'));script.src=`${url}${url.includes('?')?'&':'?'}callback=${callback}&_=${Date.now()}`;document.head.appendChild(script);});}
+  async function postShared(payload){const response=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});return response;}
   async function loadPublicData(){
     if(dataLoadPromise)return dataLoadPromise;
     dataLoadPromise=(async()=>{
       $('bookStatus').textContent='Consultando participaciones en Google Sheets…';
       try{
         if(!GOOGLE_SCRIPT_URL.startsWith('https://script.google.com/macros/s/'))throw new Error('Conexión pendiente: falta pegar la URL /exec del Apps Script.');
-        const payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=read`);if(!payload||payload.ok!==true)throw new Error(payload?.error||'Google Sheets no devolvió datos.');
+        let payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=read`);if(!payload||payload.ok!==true)throw new Error(payload?.error||'Google Sheets no devolvió datos.');
+        if(Array.isArray(payload.reports)&&Array.isArray(payload.locations)){
+          const remoteReportIds=new Set(payload.reports.map(r=>String(r.id||'')));
+          const remoteLocations=payload.locations;
+          if(!state.sharedMigrationDone){
+            let migrated=false;
+            for(const report of state.legacyReports){if(report?.id&&!remoteReportIds.has(String(report.id))){await postShared({action:'submit',report});migrated=true;}}
+            for(const pin of state.legacyPins){if(pin?.department&&pin?.territory&&!remoteLocations.some(item=>locationMatches(item,pin))){await postShared({action:'saveLocation',location:pin});migrated=true;}}
+            state.sharedMigrationDone=state.inventoryLoaded||!state.legacyPins.some(pin=>!pin.department);
+            if(migrated)payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=read`);
+          }
+          state.userReports=Array.isArray(payload.reports)?payload.reports:[];
+          state.pins=Array.isArray(payload.locations)?payload.locations:[];
+          localStorage.setItem(KEY,JSON.stringify(state.pins));persistReports();
+          renderReports();renderHome();renderTerritoryList();
+        }else throw new Error('El Apps Script publicado aún no incluye la consulta compartida. Vuelve a desplegar la versión nueva de Code.gs.');
         const records=(payload.records||[]).map(r=>{const parts=dateParts(r.date);return parts&&r.territory?{year:parts[0],month:parts[1],day:parts[2],shift:norm(r.shift),territory:norm(r.territory)}:null;}).filter(Boolean);
         state.records=records;state.googleChecks=payload.statuses||[];state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas en Google Sheets`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
-        $('recordStatus').textContent='Participaciones y estatus leídos desde Google Sheets; consulta automática cada minuto.';
-        render();renderTerritoryList();updateSummary();
+        $('recordStatus').textContent='Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 15 segundos.';
+        render();renderTerritoryList();updateSummary();return true;
       }catch(err){
         $('bookStatus').textContent=`No se pudieron cargar los datos: ${err.message}`;
         $('count').textContent='Datos no disponibles';
         $('recordStatus').textContent='Verifica el despliegue de Apps Script y que su acceso permita lectura pública.';
+        return false;
       }finally{dataLoadPromise=null;}
     })();
     return dataLoadPromise;
   }
+  async function refreshSharedData(){await loadPublicData();return await loadPublicData();}
   function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function locationMatches(a,b){return normalizeKey(a?.department)===normalizeKey(b?.department)&&normalizeKey(a?.territory)===normalizeKey(b?.territory);}
   function populateLocationDepartments(){
@@ -532,12 +561,15 @@
     $('locationDepartment').disabled=true;$('locationTerritory').disabled=true;$('locateSemaphore').hidden=true;$('saveSemaphore').hidden=false;$('saveSemaphore').textContent=moving?'Guardar nueva ubicación':'Guardar ubicación';$('confirmLocation').hidden=true;$('cancelPlacement').hidden=true;
     $('locationStatus').textContent=`Ubicación preparada para ${state.locationDraft.department} · ${state.locationDraft.territory}. Guarda para ${moving?'actualizar':'agregar'} el semáforo.`;render();
   });
-  $('saveSemaphore').addEventListener('click',()=>{
+  $('saveSemaphore').addEventListener('click',async()=>{
     const draft=state.locationDraft;if(!draft||draft.x===null)return;
+    const button=$('saveSemaphore');button.disabled=true;button.textContent='Guardando…';
+    let pin;
     if(draft.mode==='move'){
-      const pin=state.pins.find(item=>item.id===draft.pinId);if(!pin)return;pin.x=draft.x;pin.y=draft.y;
-    }else state.pins.push({id:crypto.randomUUID(),x:draft.x,y:draft.y,department:draft.department,territory:draft.territory,name:draft.territory});
-    state.selected=null;localStorage.setItem(KEY,JSON.stringify(state.pins));renderTerritoryList();renderHome();resetLocationFlow();
+      pin=state.pins.find(item=>item.id===draft.pinId);if(!pin){button.disabled=false;return;}pin.x=draft.x;pin.y=draft.y;
+    }else {pin={id:crypto.randomUUID(),x:draft.x,y:draft.y,department:draft.department,territory:draft.territory,name:draft.territory};state.pins.push(pin);}
+    try{await postShared({action:'saveLocation',location:pin});const refreshed=await refreshSharedData();if(!refreshed||!state.pins.some(item=>locationMatches(item,pin)&&Number(item.x)===Number(pin.x)&&Number(item.y)===Number(pin.y)))throw new Error('El Apps Script no confirmó la ubicación. Vuelve a desplegar Code.gs.');localStorage.setItem(KEY,JSON.stringify(state.pins));state.selected=null;renderTerritoryList();renderHome();resetLocationFlow();}
+    catch(err){button.disabled=false;button.textContent=draft.mode==='move'?'Guardar nueva ubicación':'Guardar ubicación';$('locationStatus').textContent=`No se pudo guardar la ubicación compartida: ${err.message}`;}
   });
   $('cancelSemaphore').addEventListener('click',resetLocationFlow);
   $('cancelPlacement').addEventListener('click',resetLocationFlow);
@@ -701,9 +733,8 @@
   });
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
-  loadInventoryData();
-  loadPublicData();
-  setInterval(()=>{loadPublicData();loadInventoryData();if(!$('summaryView').hidden)updateSummary();},60000);
+  loadInventoryData().then(()=>loadPublicData());
+  setInterval(()=>{loadPublicData();loadInventoryData();if(!$('summaryView').hidden)updateSummary();},15000);
 })();
 </script>
 </body>
