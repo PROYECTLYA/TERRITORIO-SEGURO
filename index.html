@@ -21,6 +21,30 @@
     main.full-view aside { display:none }
     aside,.map-card { background:white; border:1px solid var(--line); border-radius:12px; box-shadow:0 4px 18px #16324f0b }
     aside { padding:18px; position:sticky; top:12px }
+    .territory-sidebar { min-width:0; max-height:calc(100vh - 24px); display:flex; flex-direction:column; gap:12px; overflow:auto }
+    .territory-sidebar-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px }
+    .territory-sidebar-head h2 { margin:0 0 4px }
+    .territory-sidebar-head p { margin:0; color:var(--muted); font-size:12px }
+    .territory-list { overflow:auto; min-height:120px; max-height:calc(100vh - 270px); padding-right:3px }
+    .territory-department { margin:0 0 12px }
+    .territory-department h3 { margin:0 0 5px; font-size:14px; color:#172b22 }
+    .territory-item { width:100%; min-height:30px; display:flex; align-items:center; gap:8px; padding:4px 6px; border:0; border-radius:5px; background:transparent; color:#b42318; font-size:12px; font-weight:500; text-align:left; cursor:default }
+    .territory-item.located { color:#3b9c68 }
+    .territory-item.has-pin { cursor:pointer }
+    .territory-item.has-pin:hover { background:#f1f7f3 }
+    .territory-status-dot { flex:none; font-size:14px; line-height:1 }
+    .territory-legend { display:flex; flex-wrap:wrap; gap:6px 12px; color:var(--muted); font-size:11px }
+    .location-form { display:grid; gap:7px; border-top:1px solid var(--line); padding-top:12px }
+    .location-form h3 { margin:0; font-size:15px }
+    .location-form label { margin:3px 0 0 }
+    .location-actions { display:grid; gap:7px; margin-top:4px }
+    .location-actions button { width:100% }
+    .map-controls { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:8px }
+    .map-controls .legend { margin-right:auto }
+    .map-controls button { width:auto; min-height:34px; padding:6px 11px }
+    .placement-hint { min-height:18px; padding:0 4px; color:var(--muted); font-size:12px }
+    .territory-item:focus-visible,.map-controls button:focus-visible { outline:3px solid #80b7e1; outline-offset:2px }
+    .location-form[hidden],.map-controls [hidden] { display:none !important }
     h2 { font-size:16px; margin:0 0 12px }
     .section { padding:0 0 17px; margin:0 0 17px; border-bottom:1px solid #e8edf2 }
     .section:last-child { border:0; margin:0; padding:0 }
@@ -181,36 +205,30 @@
   </section>
   <section id="recordsView" class="workspace-view" hidden><div class="workspace-head"><div><h2>Gestión de registros</h2><div class="summary-note" id="recordsCount">Consulta y actualiza los checks.</div></div><button id="newReport" type="button" style="width:auto">＋ Nuevo check</button></div><div class="records-card"><div class="records-toolbar"><input id="reportSearch" type="search" placeholder="Buscar por dueño, departamento o territorio"><select id="riskFilter"><option value="">Todos los resultados</option><option>NOK</option><option>OK</option></select><select id="statusFilter"><option value="">Todas las acciones</option><option>En seguimiento</option><option>Sin acción</option></select><button id="exportReports" class="secondary" type="button" style="width:auto">Exportar JSON</button></div><div id="reportsList" class="reports-list"></div></div></section>
   <main id="mapView">
-    <aside>
-      <div class="section">
-        <h2>1. Datos del panel</h2>
-        <p class="hint">Los territorios provienen de INVENTARIO_TS.xlsx; las participaciones y estatus se consultan en el libro de Google Sheets.</p>
-        <button id="refreshData" class="secondary" type="button">Actualizar datos</button>
-        <div id="bookStatus" class="status">Conectando con Google Sheets…</div>
-        <span id="count" class="pill">Cargando datos</span>
-      </div>
-      <div class="section">
-        <h2>2. Colocar y relacionar</h2>
-        <button id="addMode" type="button">Agregar ubicación en el plano</button>
-        <p class="hint">Activa el botón y haz clic en el punto del plano. Después selecciona el marcador para asignarle un territorio.</p>
-        <label for="territory">Territorio para el marcador seleccionado</label>
-        <select id="territory" disabled><option value="">Cargando territorios…</option></select>
-        <label for="pinName">Nombre visible del marcador</label>
-        <input id="pinName" type="text" placeholder="Ej. Zona 1" disabled>
-        <button id="deletePin" class="secondary" type="button" disabled style="margin-top:9px">Eliminar marcador seleccionado</button>
-        <div id="selectionStatus" class="status">Ningún marcador seleccionado.</div>
-      </div>
-      <div class="section">
-        <h2>3. Semáforo del territorio</h2>
-        <p class="hint">Se usa la respuesta más reciente a la pregunta sobre riesgo inminente. Sí = rojo intermitente; No = verde intermitente; sin check = rojo.</p>
-        <div id="recordStatus" class="status">Esperando checks de territorio…</div>
-      </div>
-      <div class="hint">Las ubicaciones se guardan en este navegador. Usa “Exportar ubicaciones” para guardar una copia en JSON.</div>
-      <button id="export" class="secondary" type="button" style="margin-top:8px">Exportar ubicaciones</button>
-      <label for="importPins">Importar ubicaciones guardadas</label><input id="importPins" type="file" accept=".json">
+    <aside id="territorySidebar" class="territory-sidebar" aria-label="Lista de territorios">
+      <div class="territory-sidebar-head"><div><h2>Territorios</h2><p>Verde claro: ubicado en el layout · Rojo: pendiente de ubicar</p></div></div>
+      <div id="territoryList" class="territory-list" role="list" aria-live="polite"><div class="empty">Cargando departamentos y territorios…</div></div>
+      <div class="territory-legend"><span>● Ubicado</span><span>● Sin ubicar</span></div>
+      <div class="territory-data-status"><span id="count" class="pill">Cargando datos</span><div id="bookStatus" class="status">Conectando con Google Sheets…</div><div id="recordStatus" class="status">Esperando checks de territorio…</div></div>
+      <button id="addSemaphore" type="button">＋ Agregar semáforo</button>
+      <button id="export" class="secondary" type="button">Exportar ubicaciones</button>
+      <section id="locationForm" class="location-form" hidden>
+        <h3 id="locationFormTitle">Nuevo semáforo</h3>
+        <label for="locationDepartment">1. Departamento</label>
+        <select id="locationDepartment"><option value="">Selecciona un departamento</option></select>
+        <label for="locationTerritory">2. Territorio</label>
+        <select id="locationTerritory" disabled><option value="">Primero selecciona el departamento</option></select>
+        <div class="location-actions">
+          <button id="locateSemaphore" type="button" disabled>Ubicar en el layout</button>
+          <button id="saveSemaphore" type="button" hidden>Guardar ubicación</button>
+          <button id="cancelSemaphore" class="secondary" type="button">Cancelar</button>
+        </div>
+        <div id="locationStatus" class="status" role="status"></div>
+      </section>
     </aside>
     <section class="map-card">
-      <div class="map-top"><h2>Plano general</h2><div style="display:flex;align-items:center;gap:14px"><span class="legend"><span style="color:#d92d20">● Riesgo inminente / sin check</span> &nbsp; <span style="color:#159447">● Riesgo no inminente</span></span><button id="viewToggle" class="secondary" type="button" style="width:auto;min-height:34px;padding:6px 11px">Vista completa</button></div></div>
+      <div class="map-top"><h2>Plano general</h2><div class="map-controls"><span class="legend"><span style="color:#d92d20">● Riesgo Sí / sin registro</span> &nbsp; <span style="color:#159447">● Riesgo No</span></span><button id="cancelPlacement" class="secondary" type="button" hidden>Cancelar ubicación</button><button id="confirmLocation" type="button" hidden>Confirmar ubicación</button><button id="sidebarToggle" class="secondary" type="button">Ocultar lista</button></div></div>
+      <div class="placement-hint" id="placementHint" role="status"></div>
       <div class="map-wrap" id="mapWrap">
         <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
         <svg id="overlay" viewBox="0 0 2048 1166" aria-label="Marcadores de ubicación"></svg>
@@ -228,17 +246,16 @@
 (() => {
   const KEY='territorios-seguros-ubicaciones-v1';
   const REPORTS_KEY='territorio-seguro-reportes-v1';
-  const INVENTORY_URL='./INVENTARIO_TS.xlsx';
+  const INVENTORY_URL='https://docs.google.com/spreadsheets/d/1vr3wyGQm6tsfP0mmg_dz_n6n5tCWa7VAj2YN8YK-3ts/gviz/tq';
   // URL de la aplicación web de Apps Script desplegada para este proyecto.
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
-  let dataLoadPromise=null;
+  let dataLoadPromise=null,inventoryLoadPromise=null;
   const $=id=>document.getElementById(id);
-  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, addMode:false, userReports:[]};
+  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[]};
   try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
-  $('viewToggle').addEventListener('click',()=>{
-    const map=$('mapView');
-    const full=map.classList.toggle('full-view');
-    $('viewToggle').textContent=full?'Mostrar filtros':'Vista completa';
+  $('sidebarToggle').addEventListener('click',()=>{
+    const full=$('mapView').classList.toggle('full-view');
+    $('sidebarToggle').textContent=full?'Mostrar lista':'Ocultar lista';
   });
   $('homeTab').addEventListener('click',()=>showView('home'));
   $('registerTab').addEventListener('click',()=>showView('register'));
@@ -254,13 +271,12 @@
     for(const [id,key] of [['homeTab','home'],['registerTab','register'],['recordsTab','records'],['mapTab','map'],['summaryTab','summary']])$(id).classList.toggle('active',view===key);
     if(view==='records')renderReports();
     if(view==='home')renderHome();
-    if(view==='map')render();
+    if(view==='map'){render();renderTerritoryList();}
   }
   const colors={missing:'#d92d20',done:'#159447',unmapped:'#1769aa'};
   try { state.pins=JSON.parse(localStorage.getItem(KEY)||'[]'); } catch { state.pins=[]; }
   const norm=v=>String(v??'').trim().replace(/\s+/g,' ');
   const normalizeKey=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es-MX');
-  function save(){localStorage.setItem(KEY,JSON.stringify(state.pins)); render();}
   function persistReports(){try{localStorage.setItem(REPORTS_KEY,JSON.stringify(state.userReports));$('reportFormStatus').textContent='';}catch{$('reportFormStatus').textContent='No se pudo guardar. El almacenamiento del navegador puede estar lleno.';}}
   function renderHome(){ $('homeReportCount').textContent=state.userReports.length; $('homeHighCount').textContent=state.userReports.filter(r=>r.risk==='NOK').length; $('homePinCount').textContent=state.pins.length; }
   function renderReports(){
@@ -301,40 +317,53 @@
   buildMatrix('startMatrix','start',startQuestions);buildMatrix('duringMatrix','during',duringQuestions);
   function setOptions(select,values,prompt){select.innerHTML=`<option value="">${prompt}</option>`+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');}
   function activeTerritoryRows(){return state.inventoryRows;}
+  function uniqueDepartments(rows){
+    const unique=new Map();for(const row of rows){const department=norm(row.department),key=normalizeKey(department);if(department&&!unique.has(key))unique.set(key,department);}
+    return [...unique.values()].sort((a,b)=>a.localeCompare(b,'es'));
+  }
   function populateDepartments(){
-    const rows=activeTerritoryRows(),unique=[...new Set(rows.map(r=>norm(r.department)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+    const rows=activeTerritoryRows(),unique=uniqueDepartments(rows);
     const previous=$('departmentSelect').value;setOptions($('departmentSelect'),unique,state.inventoryLoaded?'Selecciona un departamento':'Cargando departamentos…');
     $('departmentSelect').disabled=!state.inventoryLoaded||!document.querySelector('input[name="entityType"]:checked');
     if(unique.some(d=>normalizeKey(d)===normalizeKey(previous)))$('departmentSelect').value=unique.find(d=>normalizeKey(d)===normalizeKey(previous));
     else $('departmentSelect').value='';
   }
   populateDepartments();setOptions($('companySelect'),companies,'Selecciona una compañía');
+  function requestInventorySheet(){
+    return new Promise((resolve,reject)=>{
+      const callback=`inventoryCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`,script=document.createElement('script');
+      const timer=setTimeout(()=>finish(new Error('Tiempo de espera agotado al consultar la hoja INVENTARIO.')),20000);
+      function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}
+      window[callback]=value=>finish(null,value);
+      script.onerror=()=>finish(new Error('No se pudo consultar la hoja INVENTARIO de Google Sheets.'));
+      const params=new URLSearchParams({sheet:'INVENTARIO',tq:'select A, C where A is not null and C is not null',headers:'1',tqx:`out:json;responseHandler:${callback}`});
+      script.src=`${INVENTORY_URL}?${params.toString()}`;document.head.appendChild(script);
+    });
+  }
   function loadInventoryData(){
-    if(!window.XLSX){setOptions($('departmentSelect'),[],'No disponible: revisa INVENTARIO_TS.xlsx');$('departmentSelect').disabled=true;$('territoryHint').textContent='No se pudo iniciar la lectura de INVENTARIO_TS.xlsx.';return Promise.resolve(false);}
-    return fetch(INVENTORY_URL,{cache:'no-store'}).then(async response=>{
-      if(!response.ok)throw new Error(`INVENTARIO_TS.xlsx no está disponible (HTTP ${response.status}).`);
-      const workbook=XLSX.read(await response.arrayBuffer(),{type:'array',cellDates:true});let rowsFound=[];
-      for(const sheetName of workbook.SheetNames){
-        const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:''});
-        for(let hr=0;hr<Math.min(rows.length,30);hr++){
-          const headers=(rows[hr]||[]).map(v=>normalizeKey(v));
-          const deptCol=headers.findIndex(h=>/^(departamento|departments?|depto|area|área)$/.test(h)||h.includes('departamento'));
-          const terrCol=headers.findIndex(h=>/^(territorio|territories|territory)$/.test(h)||h.includes('territorio'));
-          if(deptCol<0||terrCol<0)continue;
-          let currentDepartment='';for(let r=hr+1;r<rows.length;r++){const department=norm(rows[r][deptCol]),territory=norm(rows[r][terrCol]);if(department)currentDepartment=department;if(currentDepartment&&territory)rowsFound.push({department:currentDepartment,territory});}
-          if(rowsFound.length)break;
-        }
-        if(rowsFound.length)break;
-      }
-      if(!rowsFound.length)throw new Error('No encontré encabezados de Departamento y Territorio en INVENTARIO_TS.xlsx.');
-      state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;populateDepartments();updateTerritoryOptions();fillTerritories();$('territoryHint').textContent='Territorios cargados desde INVENTARIO_TS.xlsx.';$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();return true;
-    }).catch(err=>{state.inventoryLoaded=false;state.inventoryRows=[];state.territories=[];state.territoryRows=[];populateDepartments();setOptions($('departmentSelect'),[],'No disponible: revisa INVENTARIO_TS.xlsx');$('departmentSelect').disabled=true;updateTerritoryOptions();fillTerritories();$('territoryHint').textContent=`No se pudieron cargar departamentos y territorios desde INVENTARIO_TS.xlsx: ${err.message}`;$('count').textContent='Inventario no disponible';render();return false;});
+    if(inventoryLoadPromise)return inventoryLoadPromise;
+    inventoryLoadPromise=(async()=>{
+      try{
+        const payload=await requestInventorySheet();
+        if(payload?.status==='error')throw new Error(payload.errors?.[0]?.detailed_message||'Google Sheets devolvió un error al leer INVENTARIO.');
+        const rawRows=(payload?.table?.rows||[]).map(row=>({department:norm(row.c?.[0]?.v??row.c?.[0]?.f),territory:norm(row.c?.[1]?.v??row.c?.[1]?.f)})).filter(row=>row.department&&row.territory);
+        const seen=new Set(),rowsFound=rawRows.filter(row=>{const key=`${normalizeKey(row.department)}|${normalizeKey(row.territory)}`;if(seen.has(key))return false;seen.add(key);return true;});
+        if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió pares de Departamento y Territorio en las columnas A y C.');
+        state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
+        state.pins=state.pins.map(p=>p.department?p:{...p,department:rowsFound.find(r=>normalizeKey(r.territory)===normalizeKey(p.territory))?.department||''});localStorage.setItem(KEY,JSON.stringify(state.pins));
+        populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();$('territoryHint').textContent='Departamentos y territorios actualizados desde Google Sheets · hoja INVENTARIO.';$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();return true;
+      }catch(err){
+        if(!state.inventoryLoaded){state.inventoryRows=[];state.territories=[];state.territoryRows=[];populateDepartments();populateLocationDepartments();setOptions($('departmentSelect'),[],'No disponible: revisa la hoja INVENTARIO');$('departmentSelect').disabled=true;updateTerritoryOptions();$('count').textContent='Inventario no disponible';render();}
+        $('territoryHint').textContent=`No se pudieron actualizar los datos de INVENTARIO en Google Sheets: ${err.message}`;renderTerritoryList();return false;
+      }finally{inventoryLoadPromise=null;}
+    })();
+    return inventoryLoadPromise;
   }
   function updateTerritoryOptions(){
     const dept=$('departmentSelect').value, target=$('checkTerritory');
     const list=[...new Set(activeTerritoryRows().filter(r=>normalizeKey(r.department)===normalizeKey(dept)).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
     target.disabled=!state.inventoryLoaded||!dept;target.required=!!dept;setOptions(target,list,list.length?'Selecciona tu territorio':(state.inventoryLoaded?'No hay territorios para este departamento':'Cargando territorios…'));
-    if(dept&&!list.length&&state.inventoryLoaded)$('territoryHint').textContent=`No hay territorios asociados a ${dept} en INVENTARIO_TS.xlsx.`;
+    if(dept&&!list.length&&state.inventoryLoaded)$('territoryHint').textContent=`No hay territorios asociados a ${dept} en la hoja INVENTARIO de Google Sheets.`;
   }
   function updateEntityFields(){
     const entity=document.querySelector('input[name="entityType"]:checked')?.value||'';
@@ -398,7 +427,6 @@
     if(dataLoadPromise)return dataLoadPromise;
     dataLoadPromise=(async()=>{
       $('bookStatus').textContent='Consultando participaciones en Google Sheets…';
-      $('refreshData').disabled=true;
       try{
         if(!GOOGLE_SCRIPT_URL.startsWith('https://script.google.com/macros/s/'))throw new Error('Conexión pendiente: falta pegar la URL /exec del Apps Script.');
         const payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=read`);if(!payload||payload.ok!==true)throw new Error(payload?.error||'Google Sheets no devolvió datos.');
@@ -407,45 +435,103 @@
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas en Google Sheets`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
         $('recordStatus').textContent='Participaciones y estatus leídos desde Google Sheets; consulta automática cada minuto.';
-        render();updateSummary();
+        render();renderTerritoryList();updateSummary();
       }catch(err){
         $('bookStatus').textContent=`No se pudieron cargar los datos: ${err.message}`;
         $('count').textContent='Datos no disponibles';
         $('recordStatus').textContent='Verifica el despliegue de Apps Script y que su acceso permita lectura pública.';
-      }finally{$('refreshData').disabled=false;dataLoadPromise=null;}
+      }finally{dataLoadPromise=null;}
     })();
     return dataLoadPromise;
   }
-  function fillTerritories(){
-    const s=$('territory'); s.innerHTML='<option value="">Selecciona un territorio</option>'+state.territories.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
-    s.disabled=!state.selected;
-  }
   function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-  function selectedPin(){return state.pins.find(p=>p.id===state.selected);}
-  function syncEditor(){
-    const p=selectedPin(), enabled=!!p;
-    $('territory').disabled=!enabled||!state.territories.length;
-    $('pinName').disabled=!enabled; $('deletePin').disabled=!enabled;
-    $('territory').value=p?.territory||''; $('pinName').value=p?.name||'';
-    $('selectionStatus').textContent=p?`Editando ${p.name||'marcador'}${p.territory?' · '+p.territory:''}.`:'Ningún marcador seleccionado.';
+  function locationMatches(a,b){return normalizeKey(a?.department)===normalizeKey(b?.department)&&normalizeKey(a?.territory)===normalizeKey(b?.territory);}
+  function populateLocationDepartments(){
+    const select=$('locationDepartment'),departments=uniqueDepartments(state.inventoryRows);
+    setOptions(select,departments,state.inventoryLoaded?'Selecciona un departamento':'Cargando departamentos…');
+    select.disabled=!state.inventoryLoaded;
   }
-  function checkStatus(territory){
-    if(!territory)return false;
-    const checks=state.googleChecks.filter(r=>normalizeKey(r.territory)===normalizeKey(territory)).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.timestamp).localeCompare(String(a.timestamp)));
-    return checks.length?String(checks[0].imminentRisk).toLocaleLowerCase('es-MX')==='no':false;
+  function updateLocationTerritories(){
+    const department=$('locationDepartment').value,territories=[...new Set(state.inventoryRows.filter(r=>normalizeKey(r.department)===normalizeKey(department)).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
+    setOptions($('locationTerritory'),territories,department?'Selecciona un territorio':'Primero selecciona el departamento');
+    $('locationTerritory').disabled=!department||!state.inventoryLoaded;
+    $('locateSemaphore').disabled=!department||!$('locationTerritory').value;
+  }
+  function renderTerritoryList(){
+    const container=$('territoryList');
+    if(!state.inventoryLoaded){container.innerHTML='<div class="empty">No se pudo cargar el inventario de territorios.</div>';return;}
+    const departments=uniqueDepartments(state.inventoryRows);
+    if(!departments.length){container.innerHTML='<div class="empty">El inventario no contiene departamentos.</div>';return;}
+    container.innerHTML=departments.map(department=>{
+      const territories=[...new Set(state.inventoryRows.filter(r=>normalizeKey(r.department)===normalizeKey(department)).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
+      return `<section class="territory-department"><h3>${esc(department)}</h3>${territories.map(territory=>{
+        const pin=state.pins.find(p=>locationMatches(p,{department,territory}));
+        return `<button type="button" class="territory-item ${pin?'located has-pin':'not-located'}" ${pin?`data-pin-id="${esc(pin.id)}" aria-label="${esc(department)}: ${esc(territory)}, ubicado en el layout"`:''}><span class="territory-status-dot" aria-hidden="true">●</span><span>${esc(territory)}</span></button>`;
+      }).join('')}</section>`;
+    }).join('');
+  }
+  function pinRiskStatus(department,territory){
+    const checks=state.googleChecks.filter(r=>{
+      const rowTerritory=norm(r.territory??r.territorio??r.area);
+      const rowDepartment=norm(r.department??r.departamento??r.depto);
+      if(normalizeKey(rowTerritory)!==normalizeKey(territory))return false;
+      return !rowDepartment||normalizeKey(rowDepartment)===normalizeKey(department);
+    }).sort((a,b)=>String(b.timestamp||b.date||'').localeCompare(String(a.timestamp||a.date||'')));
+    if(!checks.length)return 'risk';
+    return normalizeKey(checks[0].imminentRisk??checks[0].pregunta15??checks[0].q15)==='no'?'safe':'risk';
   }
   function render(){
     const svg=$('overlay'); svg.innerHTML='';
     for(const p of state.pins){
-      const status=checkStatus(p.territory), color=status===null?colors.unmapped:(status?colors.done:colors.missing);
+      const status=pinRiskStatus(p.department,p.territory), color=status==='safe'?colors.done:colors.missing;
       const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','pin'+(p.id===state.selected?' selected':'')); g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`); g.dataset.id=p.id;
-      const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('r','13'); c.setAttribute('fill',color); c.style.color=color; if(status!==null)c.setAttribute('class','blink');
-      const t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('y','-19'); t.textContent=p.name||p.territory||'Ubicación';
-      g.append(c,t); g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;state.addMode=false;$('addMode').textContent='Agregar ubicación en el plano';syncEditor();render();}); svg.append(g);
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('r','13'); c.setAttribute('fill',color); c.style.color=color; c.setAttribute('class','blink');
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('y','-19'); t.textContent=p.territory; g.setAttribute('aria-label',`${p.department} · ${p.territory}`);
+      g.append(c,t); g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;}); svg.append(g);
     }
-    $('mapWrap').style.cursor=state.addMode?'crosshair':'default';
-    $('mapMessage').textContent=state.pins.length?`${state.pins.length} ubicación(es) marcada(s). Verde intermitente = el check más reciente indica que el riesgo no es inminente; rojo intermitente = riesgo inminente o falta de check.`:'Agrega una ubicación y asígnale un territorio. Los marcadores se actualizan con el riesgo indicado en el check más reciente.';
+    if(state.locationDraft?.x!==undefined&&state.locationDraft?.x!==null){
+      const p=state.locationDraft,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','pin selected');g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`);
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r','13');c.setAttribute('fill',colors.unmapped);c.setAttribute('class','blink');
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y','-19');t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);svg.append(g);
+    }
+    $('mapWrap').style.cursor=state.placementMode?'crosshair':'default';
+    $('mapMessage').textContent=state.pins.length?`${state.pins.length} semáforo(s) en el layout. Verde intermitente = la respuesta más reciente a la pregunta 15 fue No; rojo intermitente = Sí o sin registro.`:'Agrega un semáforo y colócalo en el territorio correspondiente.';
   }
+  function resetLocationFlow(){
+    state.locationDraft=null;state.placementMode=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;
+    $('locationDepartment').disabled=!state.inventoryLoaded;$('locationDepartment').value='';updateLocationTerritories();$('locationTerritory').value='';
+    $('locateSemaphore').hidden=false;$('saveSemaphore').hidden=true;$('confirmLocation').hidden=true;$('placementHint').textContent='';$('locationStatus').textContent='';render();
+  }
+  function beginLocationFlow(){
+    resetLocationFlow();$('locationForm').hidden=false;$('locationFormTitle').textContent='Nuevo semáforo';$('locationStatus').textContent='Selecciona un departamento y su territorio.';
+    if(!state.inventoryLoaded)$('locationStatus').textContent='Espera a que cargue la hoja INVENTARIO de Google Sheets.';
+  }
+  $('addSemaphore').addEventListener('click',beginLocationFlow);
+  $('locationDepartment').addEventListener('change',()=>{updateLocationTerritories();$('locationTerritory').value='';$('locateSemaphore').disabled=true;});
+  $('locationTerritory').addEventListener('change',()=>{$('locateSemaphore').disabled=!$('locationTerritory').value;});
+  $('locateSemaphore').addEventListener('click',()=>{
+    const department=$('locationDepartment').value,territory=$('locationTerritory').value;
+    if(!department||!territory)return;
+    if(state.pins.some(p=>locationMatches(p,{department,territory}))){$('locationStatus').textContent='Ese territorio ya tiene un semáforo en el layout.';return;}
+    state.locationDraft={department,territory,x:null,y:null};state.placementMode=true;$('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=true;$('placementHint').textContent=`Haz clic en el layout para ubicar ${department} · ${territory}.`;$('locationStatus').textContent='';render();
+  });
+  $('confirmLocation').addEventListener('click',()=>{
+    if(!state.locationDraft||state.locationDraft.x===null)return;
+    state.placementMode=false;$('locationForm').hidden=false;$('locationFormTitle').textContent='Confirmar semáforo';
+    $('locationDepartment').value=state.locationDraft.department;$('locationTerritory').value=state.locationDraft.territory;
+    $('locationDepartment').disabled=true;$('locationTerritory').disabled=true;$('locateSemaphore').hidden=true;$('saveSemaphore').hidden=false;$('confirmLocation').hidden=true;$('cancelPlacement').hidden=true;
+    $('locationStatus').textContent=`Ubicación preparada para ${state.locationDraft.department} · ${state.locationDraft.territory}. Guarda para agregarla al layout.`;render();
+  });
+  $('saveSemaphore').addEventListener('click',()=>{
+    const draft=state.locationDraft;if(!draft||draft.x===null)return;
+    state.pins.push({id:crypto.randomUUID(),x:draft.x,y:draft.y,department:draft.department,territory:draft.territory,name:draft.territory});
+    state.selected=null;localStorage.setItem(KEY,JSON.stringify(state.pins));renderTerritoryList();renderHome();resetLocationFlow();
+  });
+  $('cancelSemaphore').addEventListener('click',resetLocationFlow);
+  $('cancelPlacement').addEventListener('click',resetLocationFlow);
+  $('territoryList').addEventListener('click',ev=>{
+    const item=ev.target.closest('[data-pin-id]');if(!item)return;state.selected=item.dataset.pinId;render();
+  });
   const weekdays=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
   const turnNames=['Primer turno','Segundo turno','Tercer turno'];
   const turnHours=['22:00–06:00','06:00–14:00','14:00–22:00'];
@@ -595,22 +681,16 @@
     if(state.collapsedDays.has(day))state.collapsedDays.delete(day);else state.collapsedDays.add(day);
     renderWeeklyTable();
   });
-  $('addMode').addEventListener('click',()=>{state.addMode=!state.addMode;$('addMode').textContent=state.addMode?'Haz clic en el plano…':'Agregar ubicación en el plano';});
   $('overlay').addEventListener('click',ev=>{
-    if(!state.addMode)return;
-    const rect=ev.currentTarget.getBoundingClientRect(), x=(ev.clientX-rect.left)/rect.width, y=(ev.clientY-rect.top)/rect.height;
-    const p={id:crypto.randomUUID(),x,y,name:`Ubicación ${state.pins.length+1}`,territory:''}; state.pins.push(p);state.selected=p.id;state.addMode=false;$('addMode').textContent='Agregar ubicación en el plano';save();syncEditor();
+    if(!state.placementMode||!state.locationDraft)return;
+    const rect=$('mapWrap').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
+    state.locationDraft.x=Math.max(0,Math.min(1,x));state.locationDraft.y=Math.max(0,Math.min(1,y));state.placementMode=false;$('confirmLocation').hidden=false;$('cancelPlacement').hidden=false;$('placementHint').textContent='Revisa la marca azul; pulsa “Confirmar ubicación” para regresar al formulario.';render();
   });
-  $('territory').addEventListener('change',e=>{const p=selectedPin();if(p){p.territory=e.target.value; if(p.territory && /^Ubicación \d+$/.test(p.name))p.name=p.territory;save();syncEditor();}});
-  $('pinName').addEventListener('input',e=>{const p=selectedPin();if(p){p.name=e.target.value;save();}});
-  $('deletePin').addEventListener('click',()=>{state.pins=state.pins.filter(p=>p.id!==state.selected);state.selected=null;save();syncEditor();});
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
-  $('importPins').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data))throw Error();state.pins=data;state.selected=null;save();syncEditor();}catch{$('selectionStatus').textContent='El archivo de ubicaciones no tiene un formato válido.';}});
-  $('refreshData').addEventListener('click',()=>{loadPublicData();loadInventoryData();});
-  fillTerritories(); syncEditor(); render();resetReportForm();renderReports();showView('home');
+  populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
   loadInventoryData();
   loadPublicData();
-  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},60000);
+  setInterval(()=>{loadPublicData();loadInventoryData();if(!$('summaryView').hidden)updateSummary();},60000);
 })();
 </script>
 </body>
