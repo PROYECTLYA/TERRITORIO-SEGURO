@@ -286,8 +286,8 @@
     if(view==='map'){render();renderTerritoryList();}
   }
   const colors={missing:'#d92d20',done:'#159447',unmapped:'#1769aa'};
-  try { state.pins=JSON.parse(localStorage.getItem(KEY)||'[]'); } catch { state.pins=[]; }
-  state.legacyPins=[...state.pins];
+  try { state.legacyPins=JSON.parse(localStorage.getItem(KEY)||'[]'); if(!Array.isArray(state.legacyPins))state.legacyPins=[]; } catch { state.legacyPins=[]; }
+  state.pins=[]; // Solo ubicaciones confirmadas por el almacenamiento compartido.
   const norm=v=>String(v??'').trim().replace(/\s+/g,' ');
   const normalizeKey=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es-MX');
   function persistReports(){try{localStorage.setItem(REPORTS_KEY,JSON.stringify(state.userReports));localStorage.setItem(OWNED_REPORTS_KEY,JSON.stringify([...state.ownedReportIds]));$('reportFormStatus').textContent='';}catch{$('reportFormStatus').textContent='No se pudo guardar la copia local.';}}
@@ -363,8 +363,11 @@
         const seen=new Set(),rowsFound=rawRows.filter(row=>{const key=`${normalizeKey(row.department)}|${normalizeKey(row.territory)}`;if(seen.has(key))return false;seen.add(key);return true;});
         if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió pares de Departamento y Territorio en las columnas A y C.');
         state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
-        state.pins=state.pins.map(p=>p.department?p:{...p,department:rowsFound.find(r=>normalizeKey(r.territory)===normalizeKey(p.territory))?.department||''});localStorage.setItem(KEY,JSON.stringify(state.pins));
-        state.legacyPins=state.legacyPins.map(p=>p.department?p:{...p,department:rowsFound.find(r=>normalizeKey(r.territory)===normalizeKey(p.territory))?.department||''});
+        state.legacyPins=state.legacyPins.map(p=>{
+          if(p.department)return p;
+          const departments=[...new Set(rowsFound.filter(r=>normalizeKey(r.territory)===normalizeKey(p.territory)).map(r=>r.department))];
+          return {...p,department:departments.length===1?departments[0]:''};
+        });
         populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();$('territoryHint').textContent='Departamentos y territorios actualizados desde Google Sheets · hoja INVENTARIO.';$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();return true;
       }catch(err){
         if(!state.inventoryLoaded){state.inventoryRows=[];state.territories=[];state.territoryRows=[];populateDepartments();populateLocationDepartments();setOptions($('departmentSelect'),[],'No disponible: revisa la hoja INVENTARIO');$('departmentSelect').disabled=true;updateTerritoryOptions();$('count').textContent='Inventario no disponible';render();}
@@ -457,19 +460,22 @@
             let migrated=false;
             for(const report of state.legacyReports){if(report?.id&&!remoteReportIds.has(String(report.id))){await postShared({action:'submit',report});migrated=true;}}
             for(const pin of state.legacyPins){if(pin?.department&&pin?.territory&&!remoteLocations.some(item=>locationMatches(item,pin))){await postShared({action:'saveLocation',location:pin});migrated=true;}}
-            state.sharedMigrationDone=state.inventoryLoaded||!state.legacyPins.some(pin=>!pin.department);
             if(migrated)payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=read`);
+            const reportsSynced=state.legacyReports.every(report=>payload.reports.some(item=>String(item.id)===String(report.id)));
+            const locationsSynced=state.legacyPins.every(pin=>pin.department&&pin.territory&&payload.locations.some(item=>locationMatches(item,pin)));
+            state.sharedMigrationDone=reportsSynced&&locationsSynced;
           }
           state.userReports=Array.isArray(payload.reports)?payload.reports:[];
           state.pins=Array.isArray(payload.locations)?payload.locations:[];
-          localStorage.setItem(KEY,JSON.stringify(state.pins));persistReports();
+          if(state.sharedMigrationDone)localStorage.setItem(KEY,JSON.stringify(state.pins));
+          persistReports();
           renderReports();renderHome();renderTerritoryList();
         }else throw new Error('El Apps Script publicado aún no incluye la consulta compartida. Vuelve a desplegar la versión nueva de Code.gs.');
         const records=(payload.records||[]).map(r=>{const parts=dateParts(r.date);return parts&&r.territory?{year:parts[0],month:parts[1],day:parts[2],shift:norm(r.shift),territory:norm(r.territory)}:null;}).filter(Boolean);
         state.records=records;state.googleChecks=payload.statuses||[];state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas en Google Sheets`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
-        $('recordStatus').textContent='Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 15 segundos.';
+        $('recordStatus').textContent=state.sharedMigrationDone?'Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 15 segundos.':'Conexión compartida activa. Sincronizando ubicaciones y registros guardados anteriormente en este navegador…';
         render();renderTerritoryList();updateSummary();return true;
       }catch(err){
         $('bookStatus').textContent=`No se pudieron cargar los datos: ${err.message}`;
@@ -540,7 +546,7 @@
       const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y','-19');t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);svg.append(g);
     }
     $('mapWrap').style.cursor=state.placementMode?'crosshair':'default';
-    $('mapMessage').textContent=state.pins.length?`${state.pins.length} semáforo(s) en el layout. Verde intermitente = la respuesta más reciente a la pregunta 15 fue No; rojo intermitente = Sí o sin registro.`:'Agrega un semáforo y colócalo en el territorio correspondiente.';
+    $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) leídos de Google Sheets. Verde intermitente = la respuesta más reciente a la pregunta 15 fue No; rojo intermitente = Sí o sin registro.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
   }
   function resetLocationFlow(){
     state.locationDraft=null;state.placementMode=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;
