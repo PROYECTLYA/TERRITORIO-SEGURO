@@ -29,7 +29,10 @@
     .territory-department { margin:0 0 12px }
     .territory-department h3 { margin:0 0 5px; font-size:14px; color:#172b22 }
     .territory-item { width:100%; min-height:30px; display:flex; align-items:center; gap:8px; padding:4px 6px; border:0; border-radius:5px; background:transparent; color:#b42318; font-size:12px; font-weight:500; text-align:left; cursor:default }
+    .territory-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; margin:2px 0 }
     .territory-item.located { color:#3b9c68 }
+    .modify-pin-button { width:auto; min-height:28px; padding:3px 7px; border:1px solid #d8e0e9; border-radius:5px; background:white; color:#315b46; font-size:11px; cursor:pointer }
+    .modify-pin-button:hover { background:#eff8f2 }
     .territory-item.has-pin { cursor:pointer }
     .territory-item.has-pin:hover { background:#f1f7f3 }
     .territory-status-dot { flex:none; font-size:14px; line-height:1 }
@@ -466,7 +469,8 @@
       const territories=[...new Set(state.inventoryRows.filter(r=>normalizeKey(r.department)===normalizeKey(department)).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
       return `<section class="territory-department"><h3>${esc(department)}</h3>${territories.map(territory=>{
         const pin=state.pins.find(p=>locationMatches(p,{department,territory}));
-        return `<button type="button" class="territory-item ${pin?'located has-pin':'not-located'}" ${pin?`data-pin-id="${esc(pin.id)}" aria-label="${esc(department)}: ${esc(territory)}, ubicado en el layout"`:''}><span class="territory-status-dot" aria-hidden="true">●</span><span>${esc(territory)}</span></button>`;
+        const label=`<span class="territory-status-dot" aria-hidden="true">●</span><span>${esc(territory)}</span>`;
+        return pin?`<div class="territory-row"><button type="button" class="territory-item located has-pin" data-pin-id="${esc(pin.id)}" aria-label="${esc(department)}: ${esc(territory)}, ubicado en el layout">${label}</button><button type="button" class="modify-pin-button" data-move-pin="${esc(pin.id)}">Modificar ubicación</button></div>`:`<div class="territory-item not-located" role="listitem">${label}</div>`;
       }).join('')}</section>`;
     }).join('');
   }
@@ -500,11 +504,16 @@
   function resetLocationFlow(){
     state.locationDraft=null;state.placementMode=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;
     $('locationDepartment').disabled=!state.inventoryLoaded;$('locationDepartment').value='';updateLocationTerritories();$('locationTerritory').value='';
-    $('locateSemaphore').hidden=false;$('saveSemaphore').hidden=true;$('confirmLocation').hidden=true;$('placementHint').textContent='';$('locationStatus').textContent='';render();
+    $('locateSemaphore').hidden=false;$('saveSemaphore').hidden=true;$('saveSemaphore').textContent='Guardar ubicación';$('confirmLocation').hidden=true;$('placementHint').textContent='';$('locationStatus').textContent='';render();
   }
   function beginLocationFlow(){
     resetLocationFlow();$('locationForm').hidden=false;$('locationFormTitle').textContent='Nuevo semáforo';$('locationStatus').textContent='Selecciona un departamento y su territorio.';
     if(!state.inventoryLoaded)$('locationStatus').textContent='Espera a que cargue la hoja INVENTARIO de Google Sheets.';
+  }
+  function beginMoveFlow(pinId){
+    const pin=state.pins.find(item=>item.id===pinId);if(!pin)return;
+    resetLocationFlow();state.locationDraft={mode:'move',pinId:pin.id,department:pin.department,territory:pin.territory,x:null,y:null};state.placementMode=true;
+    $('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('placementHint').textContent=`Haz clic en el layout para reubicar ${pin.department} · ${pin.territory}.`;render();
   }
   $('addSemaphore').addEventListener('click',beginLocationFlow);
   $('locationDepartment').addEventListener('change',()=>{updateLocationTerritories();$('locationTerritory').value='';$('locateSemaphore').disabled=true;});
@@ -517,19 +526,23 @@
   });
   $('confirmLocation').addEventListener('click',()=>{
     if(!state.locationDraft||state.locationDraft.x===null)return;
-    state.placementMode=false;$('locationForm').hidden=false;$('locationFormTitle').textContent='Confirmar semáforo';
+    state.placementMode=false;$('locationForm').hidden=false;
+    const moving=state.locationDraft.mode==='move';$('locationFormTitle').textContent=moving?'Modificar ubicación':'Confirmar semáforo';
     $('locationDepartment').value=state.locationDraft.department;$('locationTerritory').value=state.locationDraft.territory;
-    $('locationDepartment').disabled=true;$('locationTerritory').disabled=true;$('locateSemaphore').hidden=true;$('saveSemaphore').hidden=false;$('confirmLocation').hidden=true;$('cancelPlacement').hidden=true;
-    $('locationStatus').textContent=`Ubicación preparada para ${state.locationDraft.department} · ${state.locationDraft.territory}. Guarda para agregarla al layout.`;render();
+    $('locationDepartment').disabled=true;$('locationTerritory').disabled=true;$('locateSemaphore').hidden=true;$('saveSemaphore').hidden=false;$('saveSemaphore').textContent=moving?'Guardar nueva ubicación':'Guardar ubicación';$('confirmLocation').hidden=true;$('cancelPlacement').hidden=true;
+    $('locationStatus').textContent=`Ubicación preparada para ${state.locationDraft.department} · ${state.locationDraft.territory}. Guarda para ${moving?'actualizar':'agregar'} el semáforo.`;render();
   });
   $('saveSemaphore').addEventListener('click',()=>{
     const draft=state.locationDraft;if(!draft||draft.x===null)return;
-    state.pins.push({id:crypto.randomUUID(),x:draft.x,y:draft.y,department:draft.department,territory:draft.territory,name:draft.territory});
+    if(draft.mode==='move'){
+      const pin=state.pins.find(item=>item.id===draft.pinId);if(!pin)return;pin.x=draft.x;pin.y=draft.y;
+    }else state.pins.push({id:crypto.randomUUID(),x:draft.x,y:draft.y,department:draft.department,territory:draft.territory,name:draft.territory});
     state.selected=null;localStorage.setItem(KEY,JSON.stringify(state.pins));renderTerritoryList();renderHome();resetLocationFlow();
   });
   $('cancelSemaphore').addEventListener('click',resetLocationFlow);
   $('cancelPlacement').addEventListener('click',resetLocationFlow);
   $('territoryList').addEventListener('click',ev=>{
+    const move=ev.target.closest('[data-move-pin]');if(move){ev.stopPropagation();beginMoveFlow(move.dataset.movePin);return;}
     const item=ev.target.closest('[data-pin-id]');if(!item)return;state.selected=item.dataset.pinId;render();
   });
   const weekdays=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
