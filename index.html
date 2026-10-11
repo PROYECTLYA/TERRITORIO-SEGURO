@@ -228,8 +228,8 @@
   const KEY='territorios-seguros-ubicaciones-v1';
   const REPORTS_KEY='territorio-seguro-reportes-v1';
   const INVENTORY_URL='./INVENTARIO_TS.xlsx';
-  // URL del despliegue de Apps Script. Pega aquí la URL /exec al publicar el backend.
-  const GOOGLE_SCRIPT_URL=https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec;
+  // URL de la aplicación web de Apps Script desplegada para este proyecto.
+  const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
   let dataLoadPromise=null;
   const $=id=>document.getElementById(id);
   const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, addMode:false, userReports:[]};
