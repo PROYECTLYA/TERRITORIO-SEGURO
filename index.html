@@ -98,12 +98,87 @@
     .weekly-table .day-toggle { margin-left:7px; min-width:26px; min-height:24px; padding:1px 6px; line-height:1 }
     .table-toolbar input { width:min(280px,100%); min-height:36px }
     .empty-summary { padding:34px 16px; text-align:center; color:var(--muted) }
+    .views { flex-wrap:wrap }
+    .views button { min-height:38px }
+    .workspace-view { padding:20px; max-width:1500px; margin:0 auto }
+    .workspace-head { display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:12px; margin-bottom:16px }
+    .workspace-head h2 { font-size:22px; margin:0 0 4px }
+    .workspace-grid { display:grid; grid-template-columns:minmax(280px,390px) minmax(0,1fr); gap:16px; align-items:start }
+    .form-card,.records-card { background:white; border:1px solid var(--line); border-radius:12px; padding:18px; box-shadow:0 4px 18px #16324f0b }
+    .form-card label { margin-top:12px }
+    .form-card textarea { width:100%; min-height:90px; border:1px solid #c8d2de; border-radius:7px; padding:9px 10px; color:var(--ink); font:inherit; resize:vertical }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+    .form-actions { display:flex; gap:8px; margin-top:14px }
+    .form-actions button { flex:1 }
+    .records-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px }
+    .records-toolbar input,.records-toolbar select { flex:1; min-width:130px }
+    .reports-list { display:grid; gap:10px }
+    .report-item { border:1px solid var(--line); border-radius:9px; padding:13px; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:start }
+    .report-title { font-weight:700 }
+    .report-meta { color:var(--muted); font-size:12px; margin-top:4px }
+    .report-description { margin:8px 0 0; white-space:pre-wrap; overflow-wrap:anywhere }
+    .report-actions { display:flex; gap:6px }
+    .report-actions button { width:auto; min-height:32px; padding:5px 9px; font-size:12px }
+    .risk-chip { display:inline-block; border-radius:20px; padding:3px 8px; font-size:12px; font-weight:700; background:#fff1f0; color:#bd2b24 }
+    .risk-chip.medium { background:#fff7e6; color:#ad6800 }
+    .risk-chip.low { background:#eff9f2; color:#137c42 }
+    .empty-reports { padding:28px 14px; text-align:center; color:var(--muted) }
+    .check-form { max-width:1040px; margin:0 auto; display:grid; gap:15px }
+    .check-card { background:white; border:1px solid var(--line); border-radius:12px; padding:18px; box-shadow:0 4px 18px #16324f0b }
+    .check-card h3 { margin:0 0 12px; font-size:16px }
+    .check-card > p { margin:0 0 12px; color:var(--muted); font-size:13px }
+    .check-form label { margin:0 }
+    .check-form input[type=radio] { width:18px; min-height:18px; height:18px; accent-color:#806b17 }
+    .check-form input[type=text],.check-form input[type=date],.check-form input[type=number],.check-form select,.check-form textarea { width:100%; min-height:42px; border:1px solid #c8d2de; border-radius:7px; padding:9px 11px; color:var(--ink); font:inherit }
+    .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px }
+    .field-block { display:grid; gap:6px; margin:10px 0 }
+    .field-title { font-weight:650; font-size:14px }
+    .choice-row { display:flex; flex-wrap:wrap; gap:9px 22px; padding:7px 0 }
+    .choice-row label { display:flex; align-items:center; gap:8px; font-weight:400 }
+    .matrix-scroll { overflow:auto }
+    .matrix { min-width:650px; display:grid; grid-template-columns:minmax(250px,1fr) repeat(3,76px); align-items:stretch }
+    .matrix-head,.matrix-question,.matrix-cell { padding:10px 8px; border-bottom:1px solid #e8edf2 }
+    .matrix-head { text-align:center; font-weight:700; background:#f2f5f8 }
+    .matrix-question { font-size:13px; line-height:1.35 }
+    .matrix-cell { display:grid; place-items:center }
+    .matrix-row:nth-child(6n+1) { background:#f7f8fa }
+    .check-form textarea { min-height:100px; resize:vertical }
+    .required-mark { color:#c62828 }
+    .question-hint { font-size:12px; color:var(--muted) }
+    @media(max-width:850px) { .workspace-grid { grid-template-columns:1fr } }
     @media(max-width:850px) { main { grid-template-columns:1fr } aside { position:static } }
     @media(max-width:650px) { .summary-cards { grid-template-columns:1fr } .bar-row { grid-template-columns:86px minmax(50px,1fr) 50px } .weekly-table .namecol.c2 { left:115px } .weekly-table .namecol.c3 { left:230px } .weekly-table th.namecol { min-width:115px } }
   </style>
 </head>
 <body>
-  <header><h1>Territorios seguros</h1><p>Ubicación en plano y seguimiento semanal de reportes.</p><nav class="views"><button id="mapTab" class="active" type="button">Layout</button><button id="summaryTab" type="button">Análisis detallado</button></nav></header>
+  <header><h1>Territorio Seguro</h1><p>Reportes, ubicaciones y seguimiento de riesgos.</p><nav class="views" aria-label="Menú principal"><button id="homeTab" class="active" type="button">Inicio</button><button id="registerTab" type="button">Registrar</button><button id="recordsTab" type="button">Gestión de registros</button><button id="mapTab" type="button">Mapa de riesgo</button><button id="summaryTab" type="button">Análisis detallado</button></nav></header>
+  <section id="homeView" class="workspace-view">
+    <div class="workspace-head"><div><h2>Panel de Territorio Seguro</h2><div class="summary-note">Registra condiciones y eventos, consulta reportes y ubica los riesgos en el plano.</div></div></div>
+    <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Checks registrados</div><div class="metric-value" id="homeReportCount">0</div></div><div class="metric metric-bad"><div class="metric-label">Checks con respuestas NOK</div><div class="metric-value" id="homeHighCount">0</div></div><div class="metric metric-good"><div class="metric-label">Marcadores en el mapa</div><div class="metric-value" id="homePinCount">0</div></div></div>
+    <div class="summary-cards"><button type="button" data-view="register">＋ Registrar un reporte</button><button type="button" data-view="records">Ver y gestionar registros</button><button type="button" data-view="map">Abrir mapa de riesgo</button></div>
+  </section>
+  <section id="registerView" class="workspace-view" hidden>
+    <div class="workspace-head"><div><h2 id="formHeading">Monitoreo del dueño de territorio</h2><div class="summary-note">Completa el check del territorio observado.</div></div></div>
+    <form id="reportForm" class="check-form">
+      <input id="reportId" type="hidden">
+      <section class="check-card"><h3>Datos del dueño de territorio</h3>
+        <div class="field-grid"><div class="field-block"><label class="field-title" for="sapNumber">1. Número SAP <span class="required-mark">*</span></label><input id="sapNumber" type="number" min="2" step="1" required placeholder="Escriba un número mayor que 1"></div>
+        <div class="field-block"><label class="field-title" for="ownerName">2. Nombre completo del dueño del territorio <span class="required-mark">*</span></label><input id="ownerName" type="text" maxlength="120" required></div>
+        <div class="field-block"><label class="field-title" for="reportDate">3. Fecha en que se realiza el check <span class="required-mark">*</span></label><input id="reportDate" type="date" required></div>
+        <div class="field-block"><label class="field-title" for="reportShift">4. Turno en el que se está realizando el check <span class="required-mark">*</span></label><select id="reportShift" required><option value="">Selecciona</option><option>Primer turno</option><option>Segundo turno</option><option>Tercer turno</option></select></div></div>
+        <div class="field-block"><span class="field-title">5. Selecciona si perteneces a <span class="required-mark">*</span></span><div class="choice-row"><label><input type="radio" name="entityType" value="PLANTA" required> PLANTA</label><label><input type="radio" name="entityType" value="COMPAÑÍA" required> COMPAÑÍA</label></div></div>
+        <div class="field-grid"><div class="field-block" id="departmentBlock" hidden><label class="field-title" for="departmentSelect">6. Departamento al que perteneces <span class="required-mark">*</span></label><select id="departmentSelect"><option value="">Selecciona un departamento</option></select></div>
+        <div class="field-block" id="companyBlock" hidden><label class="field-title" for="companySelect">6. Compañía a la que perteneces <span class="required-mark">*</span></label><select id="companySelect"><option value="">Selecciona una compañía</option></select></div>
+        <div class="field-block" id="territorySelectBlock" hidden><label class="field-title" for="checkTerritory">7. Selecciona tu territorio <span class="required-mark">*</span></label><select id="checkTerritory"><option value="">Primero selecciona el departamento</option></select><span id="territoryHint" class="question-hint" role="status"></span></div>
+        <div class="field-block" id="companyTerritoryBlock" hidden><label class="field-title" for="companyTerritory">7. Selecciona tu territorio <span class="required-mark">*</span></label><input id="companyTerritory" type="text" maxlength="120" placeholder="Escribe el territorio" ></div></div>
+      </section>
+      <section class="check-card"><h3>8. Atienda las siguientes preguntas mientras observas tu Territorio <span class="required-mark">*</span></h3><p>INICIO / TÉRMINO DE TURNO · Selecciona OK, NOK o NA para cada pregunta.</p><div id="startMatrix" class="matrix-scroll"></div></section>
+      <section class="check-card"><h3>9. Atienda las siguientes preguntas mientras observa el trabajo, la tarea, el Territorio <span class="required-mark">*</span></h3><p>DURANTE EL TURNO · Selecciona OK, NOK o NA para cada pregunta.</p><div id="duringMatrix" class="matrix-scroll"></div></section>
+      <section class="check-card"><h3>10. ¿Es necesario generar una acción? <span class="required-mark">*</span></h3><div class="choice-row"><label><input type="radio" name="actionNeeded" value="Sí" required> Sí</label><label><input type="radio" name="actionNeeded" value="No" required> No</label></div><div id="actionDetailsBlock" class="field-block" hidden><label class="field-title" for="actionDetails">11. Acción a generar. Recuerda agregar el “#MonitoreoVPO” antes de colocar tu acción. Puedes agregar un # referente a alguna alerta o semana de aprendizaje. Ej.: PARA ALERTAS DE SEGURIDAD #eventoMAZCredit o para semanas de aprendizaje #SDA <span class="required-mark">*</span></label><textarea id="actionDetails" maxlength="2000" placeholder="Escriba su respuesta"></textarea></div></section>
+      <div class="form-actions"><button id="saveReport" type="submit">Enviar check</button><button id="cancelEdit" class="secondary" type="button" hidden>Cancelar</button></div><div id="reportFormStatus" class="status" role="status"></div>
+    </form>
+  </section>
+  <section id="recordsView" class="workspace-view" hidden><div class="workspace-head"><div><h2>Gestión de registros</h2><div class="summary-note" id="recordsCount">Consulta y actualiza los checks.</div></div><button id="newReport" type="button" style="width:auto">＋ Nuevo check</button></div><div class="records-card"><div class="records-toolbar"><input id="reportSearch" type="search" placeholder="Buscar por dueño, departamento o territorio"><select id="riskFilter"><option value="">Todos los resultados</option><option>NOK</option><option>OK</option></select><select id="statusFilter"><option value="">Todas las acciones</option><option>En seguimiento</option><option>Sin acción</option></select><button id="exportReports" class="secondary" type="button" style="width:auto">Exportar JSON</button></div><div id="reportsList" class="reports-list"></div></div></section>
   <main id="mapView">
     <aside>
       <div class="section">
@@ -157,23 +232,31 @@
 <script>
 (() => {
   const KEY='territorios-seguros-ubicaciones-v1';
+  const REPORTS_KEY='territorio-seguro-reportes-v1';
   const DATA_URL='./datos.xlsx';
   let dataLoadPromise=null;
   const $=id=>document.getElementById(id);
-  const state={territories:[], territoryRows:[], shifts:[], records:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, pins:[], selected:null, addMode:false};
+  const state={territories:[], territoryRows:[], shifts:[], records:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, pins:[], selected:null, addMode:false, userReports:[]};
+  try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
   $('viewToggle').addEventListener('click',()=>{
     const map=$('mapView');
     const full=map.classList.toggle('full-view');
     $('viewToggle').textContent=full?'Mostrar filtros':'Vista completa';
   });
+  $('homeTab').addEventListener('click',()=>showView('home'));
+  $('registerTab').addEventListener('click',()=>showView('register'));
+  $('recordsTab').addEventListener('click',()=>showView('records'));
   $('mapTab').addEventListener('click',()=>showView('map'));
   $('summaryTab').addEventListener('click',()=>{showView('summary');updateSummary();});
   function showView(view){
-    const summary=view==='summary';
-    document.querySelector('main').hidden=summary;
-    $('summaryView').hidden=!summary;
-    $('mapTab').classList.toggle('active',!summary);
-    $('summaryTab').classList.toggle('active',summary);
+    $('homeView').hidden=view!=='home';
+    $('registerView').hidden=view!=='register';
+    $('recordsView').hidden=view!=='records';
+    $('mapView').hidden=view!=='map';
+    $('summaryView').hidden=view!=='summary';
+    for(const [id,key] of [['homeTab','home'],['registerTab','register'],['recordsTab','records'],['mapTab','map'],['summaryTab','summary']])$(id).classList.toggle('active',view===key);
+    if(view==='records')renderReports();
+    if(view==='home')renderHome();
   }
   const colors={missing:'#d92d20',done:'#159447',unmapped:'#1769aa'};
   try { state.pins=JSON.parse(localStorage.getItem(KEY)||'[]'); } catch { state.pins=[]; }
@@ -181,6 +264,92 @@
   for(let i=1;i<=31;i++) $('day').insertAdjacentHTML('beforeend',`<option value="${i}">${i}</option>`);
   const norm=v=>String(v??'').trim().replace(/\s+/g,' ');
   function save(){localStorage.setItem(KEY,JSON.stringify(state.pins)); render();}
+  function persistReports(){try{localStorage.setItem(REPORTS_KEY,JSON.stringify(state.userReports));$('reportFormStatus').textContent='';}catch{$('reportFormStatus').textContent='No se pudo guardar. El almacenamiento del navegador puede estar lleno.';}}
+  function renderHome(){ $('homeReportCount').textContent=state.userReports.length; $('homeHighCount').textContent=state.userReports.filter(r=>r.risk==='NOK').length; $('homePinCount').textContent=state.pins.length; }
+  function renderReports(){
+    const query=normalizeKey($('reportSearch').value),risk=$('riskFilter').value,status=$('statusFilter').value;
+    const rows=state.userReports.filter(r=>(!risk||r.risk===risk)&&(!status||r.status===status)&&(!query||normalizeKey([r.type,r.area,r.description,r.owner,r.department,r.company,r.sap].join(' ')).includes(query))).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
+    $('recordsCount').textContent=`${rows.length} de ${state.userReports.length} reportes`;
+    $('reportsList').innerHTML=rows.length?rows.map(r=>`<article class="report-item"><div><div class="report-title">${esc(r.owner||'Sin nombre')} · ${esc(r.area||'Sin territorio')} <span class="risk-chip ${r.risk==='OK'?'low':''}">${esc(r.risk||'')}</span></div><div class="report-meta">SAP ${esc(r.sap||'—')} · ${esc(r.department||r.company||'')} · ${esc(r.date||'')}${r.shift?' · '+esc(r.shift):''} · ${esc(r.status||'')}</div><p class="report-description">${esc(r.description||'')}</p></div><div class="report-actions"><button type="button" class="secondary" data-edit-report="${esc(r.id)}">Editar</button><button type="button" class="secondary" data-delete-report="${esc(r.id)}">Eliminar</button></div></article>`).join(''):'<div class="empty-reports">No hay checks que coincidan con la búsqueda.</div>';
+    renderHome();
+  }
+  const departments=['ASEGURAMIENTO DE CALIDAD','COCIMIENTOS','CUARTOS FRIOS','ENVASADO','GENTE','INGENIERIA','LABORATORIO CENTRAL','LOGISTICA','PROTECCIÓN PATRIMONIAL','S&E','TRATAMIENTO DE AGUAS'];
+  const companies=['GEGSA','FORROS TERMICOS','EXSAN','MMEEPI','SONORA','CARBETOS','TOCALO','LMX','NALCO','REDIPSA','ECOLAB','CHEAMTREAT','SERVICIOS ESPECIALIZADOS','FAMDEA'];
+  const startQuestions=[
+    '¿Los integrantes de tu equipo (primera línea), entregan-reciben su territorio libre de peligros?',
+    '¿Se informa y atiende los peligros que se encuentren fuera de control?',
+    '¿Se informa sobre alertas de seguridad recientes y medidas a tomar para evitar que suceda algo similar en su territorio?'
+  ];
+  const duringQuestions=[
+    '¿Se mantienen limpias y ordenadas las áreas de trabajo y el territorio?',
+    '¿Se cierran las brechas relacionadas a mantenimiento preventivo en el territorio?',
+    '¿La maquinaria o equipo se encuentra en condición segura para su uso (cuenta con protectores y dispositivos de seguridad)?',
+    '¿Están disponibles las herramientas para realizar las tareas y se encuentran en condición segura de uso?',
+    '¿Existen procedimientos, OPL disponibles para su consulta (Fichas LOTOTO, Hojas de datos de Seguridad, manuales, etc.)?',
+    '¿Los productos químicos cuentan con diques-sardinel, están debidamente cerrados, almacenados compatiblemente y señalizados?',
+    '¿Se cuenta con señales de seguridad que den a conocer información, indiquen qué está prohibido o qué te advierta?',
+    '¿Se cuenta con plataformas, escaleras, etc. que permitan un acceso seguro a un diferente nivel y se encuentran en condición segura para su uso?',
+    '¿Se tiene revuelta por cambios de presentación? Ejemplo: línea en producción de Victoria y botes o botellas de Corona. En caso negativo, ejecutar el PDR (retiro de las diferentes presentaciones).',
+    '¿En tu territorio se tienen reparaciones temporales (componentes amarrados con rafia, cincho, trapo, cinta, etc.)?',
+    '¿El territorio se mantiene libre de hongo, vidrio y fuentes de contaminación?',
+    '¿Están disponibles los equipos para atención de emergencias y se encuentran en condición para su uso (extintores, regaderas de emergencia, kit para derrames, etc.)?',
+    '¿Se identificó la existencia de un peligro temporal (Peligro Dinámico) y se verificó el cumplimiento de las medidas de prevención o control?',
+    '¿Se monitorean y registran las variables del proceso que puedan afectar la seguridad (IP dinámico), por ejemplo: temperatura, presión, etc.?',
+    'De existir alguna persona expuesta al riesgo en tu área de trabajo (ojos y mente en la tarea, “en la línea de fuego”, etc.), ¿se reorienta para abordar los errores?'
+  ];
+  function buildMatrix(id,prefix,questions){
+    const headers=['OK','NOK','NA'];let html='<div class="matrix"><div class="matrix-head">Pregunta</div>'+headers.map(x=>`<div class="matrix-head">${x}</div>`).join('');
+    questions.forEach((q,i)=>{const n=i+1;html+=`<div class="matrix-question matrix-row">${n}. ${esc(q)}</div>`+headers.map(value=>`<label class="matrix-cell matrix-row"><input type="radio" name="${prefix}_${n}" value="${value}" aria-label="${value}: ${esc(q)}" required></label>`).join('');});
+    $(id).innerHTML=html;
+  }
+  buildMatrix('startMatrix','start',startQuestions);buildMatrix('duringMatrix','during',duringQuestions);
+  function setOptions(select,values,prompt){select.innerHTML=`<option value="">${prompt}</option>`+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');}
+  setOptions($('departmentSelect'),departments,'Selecciona un departamento');setOptions($('companySelect'),companies,'Selecciona una compañía');
+  function updateTerritoryOptions(){
+    const dept=$('departmentSelect').value, target=$('checkTerritory'), aliases={
+      'ASEGURAMIENTO DE CALIDAD':['ASEGURAMIENTO DE CALIDAD','CALIDAD'],
+      'PROTECCIÓN PATRIMONIAL':['PROTECCIÓN PATRIMONIAL','PATRIMONIAL'],
+      'CUARTOS FRIOS':['CUARTOS FRIOS','CUARTOS FRÍOS'],
+      'INGENIERIA':['INGENIERIA','INGENIERÍA'], 'LOGISTICA':['LOGISTICA','LOGÍSTICA']
+    };
+    const matchSet=(aliases[dept]||[dept]).map(normalizeKey),list=[...new Set(state.territoryRows.filter(r=>matchSet.includes(normalizeKey(r.department))).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
+    target.disabled=!dept;target.required=!!dept;setOptions(target,list,list.length?'Selecciona tu territorio':(state.loaded?'No hay territorios para este departamento':'Cargando territorios…'));
+    $('territoryHint').textContent=dept&&!list.length&&state.loaded?'No hay territorios asociados en datos.xlsx; verifica la columna de departamento y territorio.':'';
+  }
+  function updateEntityFields(){
+    const entity=document.querySelector('input[name="entityType"]:checked')?.value||'';
+    const plant=entity==='PLANTA',company=entity==='COMPAÑÍA';
+    $('departmentBlock').hidden=!plant;$('companyBlock').hidden=!company;$('territorySelectBlock').hidden=!plant;$('companyTerritoryBlock').hidden=!company;
+    $('departmentSelect').required=plant;$('departmentSelect').disabled=!plant;$('companySelect').required=company;$('companySelect').disabled=!company;
+    $('checkTerritory').required=plant;$('checkTerritory').disabled=true;$('companyTerritory').required=company;$('companyTerritory').disabled=!company;
+    if(!plant){$('departmentSelect').value='';setOptions($('checkTerritory'),[],'Primero selecciona el departamento');}
+    if(!company){$('companySelect').value='';$('companyTerritory').value='';}
+    if(plant)updateTerritoryOptions();
+  }
+  document.querySelectorAll('input[name="entityType"]').forEach(el=>el.addEventListener('change',updateEntityFields));
+  $('departmentSelect').addEventListener('change',updateTerritoryOptions);
+  document.querySelectorAll('input[name="actionNeeded"]').forEach(el=>el.addEventListener('change',()=>{const yes=document.querySelector('input[name="actionNeeded"]:checked')?.value==='Sí';$('actionDetailsBlock').hidden=!yes;$('actionDetails').required=yes;if(!yes)$('actionDetails').value='';}));
+  function resetReportForm(){ $('reportForm').reset();$('reportId').value='';$('reportDate').value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);$('formHeading').textContent='Monitoreo del dueño de territorio';$('saveReport').textContent='Enviar check';$('cancelEdit').hidden=true;$('actionDetailsBlock').hidden=true;$('actionDetails').required=false;updateEntityFields(); }
+  function editReport(id){
+    const r=state.userReports.find(x=>x.id===id);if(!r)return;resetReportForm();showView('register');$('reportId').value=r.id;$('sapNumber').value=r.sap||'';$('ownerName').value=r.owner||'';$('reportDate').value=r.date||'';$('reportShift').value=r.shift||'';
+    const entity=r.entityType||'PLANTA',radio=document.querySelector(`input[name="entityType"][value="${CSS.escape(entity)}"]`);if(radio)radio.checked=true;updateEntityFields();
+    if(entity==='PLANTA'){$('departmentSelect').value=r.department||'';updateTerritoryOptions();$('checkTerritory').value=r.area||'';}else{$('companySelect').value=r.company||'';$('companyTerritory').value=r.area||'';}
+    for(const [name,value] of Object.entries(r.answers||{})){const input=document.querySelector(`input[name="${CSS.escape(name)}"][value="${CSS.escape(value)}"]`);if(input)input.checked=true;}
+    const action=document.querySelector(`input[name="actionNeeded"][value="${CSS.escape(r.actionNeeded||'No')}"]`);if(action)action.checked=true;const yes=r.actionNeeded==='Sí';$('actionDetailsBlock').hidden=!yes;$('actionDetails').required=yes;$('actionDetails').value=r.actionDetails||'';$('formHeading').textContent='Editar monitoreo de territorio';$('saveReport').textContent='Guardar cambios';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'});
+  }
+  $('reportForm').addEventListener('submit',ev=>{
+    ev.preventDefault();const id=$('reportId').value,old=state.userReports.find(r=>r.id===id),entityType=document.querySelector('input[name="entityType"]:checked')?.value||'',department=entityType==='PLANTA'?$ ('departmentSelect').value:'',company=entityType==='COMPAÑÍA'?$ ('companySelect').value:'',area=entityType==='PLANTA'?$ ('checkTerritory').value:$ ('companyTerritory').value.trim(),answers={};
+    [...startQuestions.map((_,i)=>`start_${i+1}`),...duringQuestions.map((_,i)=>`during_${i+1}`)].forEach(name=>{answers[name]=document.querySelector(`input[name="${name}"]:checked`)?.value||'';});
+    const result=Object.values(answers).includes('NOK')?'NOK':'OK',actionNeeded=document.querySelector('input[name="actionNeeded"]:checked')?.value||'No',actionDetails=actionNeeded==='Sí'?$ ('actionDetails').value.trim():'',description=`Resultado ${result} (${Object.values(answers).filter(x=>x==='NOK').length} NOK de ${Object.keys(answers).length}).${actionDetails?' Acción: '+actionDetails:''}`;
+    const report={id:id||crypto.randomUUID(),type:'Monitoreo de territorio',sap:$('sapNumber').value,owner:$('ownerName').value.trim(),date:$('reportDate').value,shift:$('reportShift').value,entityType,department,company,area,risk:result,status:actionNeeded==='Sí'?'En seguimiento':'Sin acción',description,answers,actionNeeded,actionDetails,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+    if(old)state.userReports=state.userReports.map(r=>r.id===id?report:r);else state.userReports.push(report);persistReports();resetReportForm();showView('records');
+  });
+  $('cancelEdit').addEventListener('click',resetReportForm);
+  $('newReport').addEventListener('click',()=>{resetReportForm();showView('register');});
+  for(const id of ['reportSearch','riskFilter','statusFilter'])$(id).addEventListener('input',renderReports),$(id).addEventListener('change',renderReports);
+  $('reportsList').addEventListener('click',ev=>{const edit=ev.target.closest('[data-edit-report]'),del=ev.target.closest('[data-delete-report]');if(edit)editReport(edit.dataset.editReport);if(del&&confirm('¿Eliminar este reporte? Esta acción no se puede deshacer.')){state.userReports=state.userReports.filter(r=>r.id!==del.dataset.deleteReport);persistReports();renderReports();}});
+  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.view==='register')resetReportForm();showView(b.dataset.view);}));
+  $('exportReports').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.userReports,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='territorio-seguro-reportes.json';a.click();URL.revokeObjectURL(a.href);});
   function dateParts(v, cell){
     if(cell && cell.t==='d' && v instanceof Date) return [v.getFullYear(),v.getMonth()+1,v.getDate()];
     if(typeof v==='number' && window.XLSX){const d=XLSX.SSF.parse_date_code(v); return d?[d.y,d.m,d.d]:null;}
@@ -220,7 +389,7 @@
         state.records=records;
         state.shifts=[...shifts].sort((a,b)=>a.localeCompare(b,'es'));
         state.loaded=true;
-        fillTerritories();fillShifts();
+        fillTerritories();fillShifts();updateTerritoryOptions();
         $('count').textContent=`${state.territories.length} territorios · ${state.records.length.toLocaleString('es-MX')} registros`;
         const lastModified=response.headers.get('last-modified'),updated=lastModified?new Date(lastModified).toLocaleString('es-MX'):new Date().toLocaleString('es-MX');
         $('bookStatus').textContent=`Libro leído: ${updated}.`;
@@ -428,10 +597,11 @@
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   $('importPins').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data))throw Error();state.pins=data;state.selected=null;save();syncEditor();}catch{$('selectionStatus').textContent='El archivo de ubicaciones no tiene un formato válido.';}});
   $('refreshData').addEventListener('click',loadPublicData);
-  fillTerritories(); syncEditor(); render();
+  fillTerritories(); syncEditor(); render();resetReportForm();renderReports();showView('home');
   loadPublicData();
   setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},300000);
 })();
 </script>
 </body>
 </html>
+
