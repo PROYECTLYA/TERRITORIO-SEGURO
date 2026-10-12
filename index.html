@@ -619,9 +619,9 @@
             state.sharedMigrationDone=reportsSynced&&locationsSynced;
           }
           state.userReports=Array.isArray(payload.reports)?payload.reports:[];
-          const remoteLocations=Array.isArray(payload.locations)?payload.locations:[];
-          state.pendingLocationSaves=state.pendingLocationSaves.filter(pending=>!remoteLocations.some(remote=>locationMatches(remote,pending)&&Math.abs(Number(remote.x)-Number(pending.x))<1e-6&&Math.abs(Number(remote.y)-Number(pending.y))<1e-6));
-          state.pins=[...remoteLocations];
+          const syncedLocations=Array.isArray(payload.locations)?payload.locations:[];
+          state.pendingLocationSaves=state.pendingLocationSaves.filter(pending=>!syncedLocations.some(remote=>locationMatches(remote,pending)&&Math.abs(Number(remote.x)-Number(pending.x))<1e-6&&Math.abs(Number(remote.y)-Number(pending.y))<1e-6));
+          state.pins=[...syncedLocations];
           for(const pending of state.pendingLocationSaves){const index=state.pins.findIndex(remote=>String(remote.id)===String(pending.id)||locationMatches(remote,pending));if(index<0)state.pins.push(pending);else state.pins[index]=pending;}
           state.shiftExemptions=new Set(payload.shiftExemptions.filter(item=>item?.notApplicable).map(item=>shiftExemptionKey(item.department,item.territory,Number(item.weekday),Number(item.shift))));
           if(state.sharedMigrationDone)localStorage.setItem(KEY,JSON.stringify(state.pins));
