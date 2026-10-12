@@ -306,7 +306,7 @@
   <header><h1>Territorio Seguro</h1><p>Reportes, ubicaciones y seguimiento de riesgos.</p><nav class="views" aria-label="Menú principal"><button id="homeTab" class="active" type="button">Inicio</button><button id="registerTab" type="button">Registrar</button><button id="recordsTab" type="button">Gestión de registros</button><button id="mapTab" type="button">Mapa de riesgo</button><button id="summaryTab" type="button">Análisis detallado</button></nav></header>
   <section id="homeView" class="workspace-view">
     <div class="workspace-head"><div><h2>Panel de Territorio Seguro</h2><div class="summary-note">Registra condiciones y eventos, consulta reportes y ubica los riesgos en el plano.</div></div></div>
-    <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Checks registrados</div><div class="metric-value" id="homeReportCount">0</div></div><div class="metric metric-bad"><div class="metric-label">Checks con respuestas NOK</div><div class="metric-value" id="homeHighCount">0</div></div><div class="metric metric-good"><div class="metric-label">Marcadores en el mapa</div><div class="metric-value" id="homePinCount">0</div></div></div>
+    <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Checks del periodo reciente</div><div class="metric-value" id="homeReportCount">0</div></div><div class="metric metric-bad"><div class="metric-label">Checks recientes con respuestas NOK</div><div class="metric-value" id="homeHighCount">0</div></div><div class="metric metric-good"><div class="metric-label">Marcadores en el mapa</div><div class="metric-value" id="homePinCount">0</div></div></div>
     <div class="summary-cards"><button type="button" data-view="register">＋ Registrar check</button><button type="button" data-view="records">Ver y gestionar registros</button><button type="button" data-view="map">Abrir mapa de riesgo</button></div>
   </section>
   <section id="registerView" class="workspace-view" hidden>
@@ -330,7 +330,7 @@
       <div class="form-actions"><button id="saveReport" type="submit">Enviar check</button><button id="cancelEdit" class="secondary" type="button" hidden>Cancelar</button></div><div id="reportFormStatus" class="status" role="status"></div>
     </form>
   </section>
-  <section id="recordsView" class="workspace-view" hidden><div class="workspace-head"><div><h2>Gestión de registros</h2><div class="summary-note" id="recordsCount">Consulta y actualiza los checks.</div></div><button id="newReport" type="button" style="width:auto">＋ Nuevo check</button></div><div class="records-card"><div class="records-toolbar"><input id="reportSearch" type="search" placeholder="Buscar por dueño, departamento o territorio"><select id="riskFilter"><option value="">Todos los resultados</option><option>NOK</option><option>OK</option></select><select id="statusFilter"><option value="">Todas las acciones</option><option>En seguimiento</option><option>Sin acción</option></select><button id="exportReports" class="secondary" type="button" style="width:auto">Exportar JSON</button></div><div id="reportsList" class="reports-list"></div></div></section>
+  <section id="recordsView" class="workspace-view" hidden><div class="workspace-head"><div><h2>Gestión de registros</h2><div class="summary-note" id="recordsCount">Consulta y actualiza los checks recientes.</div></div><button id="newReport" type="button" style="width:auto">＋ Nuevo check</button></div><div class="records-card"><div class="records-toolbar"><input id="reportSearch" type="search" placeholder="Buscar por dueño, departamento o territorio"><select id="riskFilter"><option value="">Todos los resultados</option><option>NOK</option><option>OK</option></select><select id="statusFilter"><option value="">Todas las acciones</option><option>En seguimiento</option><option>Sin acción</option></select><input id="reportsFrom" type="date" aria-label="Fecha inicial para consultar registros antiguos"><input id="reportsTo" type="date" aria-label="Fecha final para consultar registros antiguos"><button id="loadOlderReports" class="secondary" type="button" style="width:auto">Consultar fechas anteriores</button><button id="exportReports" class="secondary" type="button" style="width:auto">Exportar JSON</button></div><div id="reportsList" class="reports-list"></div></div></section>
   <main id="mapView">
     <aside id="territorySidebar" class="territory-sidebar" aria-label="Lista de territorios">
       <div class="territory-sidebar-head"><div><h2>Territorios</h2><p>Verde claro: ubicado en el layout · Rojo: pendiente de ubicar</p></div></div>
@@ -381,7 +381,7 @@
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
   let dataLoadPromise=null,inventoryLoadPromise=null,renderTurnWindow=null;
   const $=id=>document.getElementById(id);
-  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
+  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], initialRange:null,weekRecordsCache:{},weekLoads:{},historicalReports:[],googleChecks:[],shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
   try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
   const hadOwnershipList=localStorage.getItem(OWNED_REPORTS_KEY)!==null;
   try { const own=JSON.parse(localStorage.getItem(OWNED_REPORTS_KEY)||'null');state.ownedReportIds=new Set(Array.isArray(own)?own:state.userReports.map(r=>r.id).filter(Boolean)); } catch { state.ownedReportIds=new Set(state.userReports.map(r=>r.id).filter(Boolean)); }
@@ -415,8 +415,9 @@
   function renderHome(){ $('homeReportCount').textContent=state.userReports.length; $('homeHighCount').textContent=state.userReports.filter(r=>r.risk==='NOK').length; $('homePinCount').textContent=state.pins.length; }
   function renderReports(){
     const query=normalizeKey($('reportSearch').value),risk=$('riskFilter').value,status=$('statusFilter').value;
-    const rows=state.userReports.filter(r=>(!risk||r.risk===risk)&&(!status||r.status===status)&&(!query||normalizeKey([r.type,r.area,r.description,r.owner,r.department,r.company,r.sap].join(' ')).includes(query))).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
-    $('recordsCount').textContent=`${rows.length} de ${state.userReports.length} reportes`;
+    const allReports=[...new Map([...state.userReports,...state.historicalReports].map(r=>[String(r.id),r])).values()];
+    const rows=allReports.filter(r=>(!risk||r.risk===risk)&&(!status||r.status===status)&&(!query||normalizeKey([r.type,r.area,r.description,r.owner,r.department,r.company,r.sap].join(' ')).includes(query))).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
+    $('recordsCount').textContent=`${rows.length} de ${allReports.length} registros cargados · los recientes se actualizan automáticamente`;
     $('reportsList').innerHTML=rows.length?rows.map(r=>{const editable=state.ownedReportIds.has(r.id),questions=[...startQuestions,...duringQuestions],answerEntries=Object.entries(r.answers||{});const answerList=answerEntries.map(([key,value])=>{const match=key.match(/^(start|during)_(\d+)$/);if(!match)return '';const list=match[1]==='start'?startQuestions:duringQuestions,label=list[Number(match[2])-1];return label?`<li><span>${esc(label)}</span><strong>${esc(value||'Sin respuesta')}</strong></li>`:'';}).join('');const participationLabel=r.validForParticipation===false?' · Guardado, sin participación':' · Contabilizado';return `<article class="report-item"><div><div class="report-title">${esc(r.owner||'Sin nombre')} · ${esc(r.area||'Sin territorio')} <span class="risk-chip ${r.risk==='OK'?'low':''}">${esc(r.risk||'')}</span></div><div class="report-meta">SAP ${esc(r.sap||'—')} · ${esc(r.department||r.company||'')} · ${esc(r.date||'')}${r.shift?' · '+esc(r.shift):''} · ${esc(r.status||'')}${participationLabel}</div><p class="report-description">${esc(r.description||'')}</p>${answerList?`<details class="report-answers"><summary>Ver respuestas del check (${questions.length})</summary><ol>${answerList}</ol></details>`:''}</div>${editable?`<div class="report-actions"><button type="button" class="secondary" data-edit-report="${esc(r.id)}">Editar</button></div>`:''}</article>`;}).join(''):'<div class="empty-reports">No hay checks que coincidan con la búsqueda.</div>';
     renderHome();
   }
@@ -555,7 +556,15 @@
   for(const id of ['reportSearch','riskFilter','statusFilter'])$(id).addEventListener('input',renderReports),$(id).addEventListener('change',renderReports);
   $('reportsList').addEventListener('click',ev=>{const edit=ev.target.closest('[data-edit-report]');if(edit)editReport(edit.dataset.editReport);});
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.view==='register')resetReportForm();showView(b.dataset.view);}));
-  $('exportReports').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.userReports,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='territorio-seguro-reportes.json';a.click();URL.revokeObjectURL(a.href);});
+  $('exportReports').addEventListener('click',()=>{const reports=[...new Map([...state.userReports,...state.historicalReports].map(r=>[String(r.id),r])).values()],blob=new Blob([JSON.stringify(reports,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='territorio-seguro-reportes.json';a.click();URL.revokeObjectURL(a.href);});
+  $('loadOlderReports').addEventListener('click',async()=>{
+    const from=$('reportsFrom').value,to=$('reportsTo').value,button=$('loadOlderReports');
+    if(!from||!to||from>to){$('recordsCount').textContent='Selecciona un rango válido de fechas para consultar el historial.';return;}
+    button.disabled=true;button.textContent='Consultando…';$('recordsCount').textContent='Consultando ese periodo en Google Sheets…';
+    try{const payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=reports&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);if(!payload?.ok)throw new Error(payload?.error||'No se pudieron consultar esas fechas.');state.historicalReports=Array.isArray(payload.reports)?payload.reports:[];renderReports();}
+    catch(err){$('recordsCount').textContent=`No se pudo consultar el historial: ${err.message}`;}
+    finally{button.disabled=false;button.textContent='Consultar fechas anteriores';}
+  });
   function dateParts(v, cell){
     if(cell && cell.t==='d' && v instanceof Date) return [v.getFullYear(),v.getMonth()+1,v.getDate()];
     if(typeof v==='number' && window.XLSX){const d=XLSX.SSF.parse_date_code(v); return d?[d.y,d.m,d.d]:null;}
@@ -579,10 +588,11 @@
           const remoteLocations=payload.locations;
           if(!state.sharedMigrationDone){
             let migrated=false;
-            for(const report of state.legacyReports){if(report?.id&&!remoteReportIds.has(String(report.id))){await postShared({action:'submit',report});migrated=true;}}
+            const recentLegacyReports=state.legacyReports.filter(report=>report?.date&&report.date>=payload.range?.from&&report.date<=payload.range?.to);
+            for(const report of recentLegacyReports){if(report?.id&&!remoteReportIds.has(String(report.id))){await postShared({action:'submit',report});migrated=true;}}
             for(const pin of state.legacyPins){if(pin?.department&&pin?.territory&&!remoteLocations.some(item=>locationMatches(item,pin))){await postShared({action:'saveLocation',location:pin});migrated=true;}}
             if(migrated)payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=read`);
-            const reportsSynced=state.legacyReports.every(report=>payload.reports.some(item=>String(item.id)===String(report.id)));
+            const reportsSynced=recentLegacyReports.every(report=>payload.reports.some(item=>String(item.id)===String(report.id)));
             const locationsSynced=state.legacyPins.every(pin=>pin.department&&pin.territory&&payload.locations.some(item=>locationMatches(item,pin)));
             state.sharedMigrationDone=reportsSynced&&locationsSynced;
           }
@@ -594,8 +604,8 @@
           renderReports();renderHome();renderTerritoryList();
         }else throw new Error('El Apps Script publicado debe actualizarse para incluir las excepciones NA. Vuelve a desplegar la versión nueva de Code.gs.');
         const records=(payload.records||[]).map(r=>{const parts=dateParts(r.date);return parts&&r.territory?{year:parts[0],month:parts[1],day:parts[2],shift:norm(r.shift),territory:norm(r.territory),department:norm(r.department)}:null;}).filter(Boolean);
-        state.records=records;state.googleChecks=payload.statuses||[];state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
-        $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas en Google Sheets`;
+        state.records=records;state.initialRange=payload.range||null;state.googleChecks=payload.statuses||[];state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
+        $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas del periodo reciente`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
         $('recordStatus').textContent=state.sharedMigrationDone?'Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 15 segundos.':'Conexión compartida activa. Sincronizando ubicaciones y registros guardados anteriormente en este navegador…';
         render();renderTerritoryList();updateSummary();return true;
@@ -860,11 +870,19 @@
     const shiftWord=turnNames[cutoffShift-1];
     $('summaryContext').textContent=`Semana ${selectedWeek} de ${currentISO.year} · corte al ${cutoffLabel}${isCurrentWeek?', '+shiftWord+' ('+turnHours[cutoffShift-1]+')':' · semana cerrada'}.`;
     $('weeklyChartCaption').textContent=`Checks válidos ÷ turnos esperados de la semana ${selectedWeek}, hasta ${dayNames[cutoffDay]}${isCurrentWeek?' · '+shiftWord+' ('+turnHours[cutoffShift-1]+')':''}, agrupado por área.`;
+    const weekFrom=dateKey(monday.getUTCFullYear(),monday.getUTCMonth()+1,monday.getUTCDate()), weekEnd=isCurrentWeek?cutoffDate:new Date(monday.getTime()+6*86400000), weekTo=dateKey(weekEnd.getUTCFullYear(),weekEnd.getUTCMonth()+1,weekEnd.getUTCDate()), weekKey=`${currentISO.year}-W${String(selectedWeek).padStart(2,'0')}`;
+    const inInitialRange=state.initialRange&&weekFrom>=state.initialRange.from&&weekTo<=state.initialRange.to;
+    let analysisRecords=inInitialRange?state.records:state.weekRecordsCache[weekKey];
+    if(!analysisRecords){
+      $('tableCaption').textContent=`Consultando de forma independiente la semana ${selectedWeek}…`;
+      if(!state.weekLoads[weekKey])state.weekLoads[weekKey]=jsonp(`${GOOGLE_SCRIPT_URL}?action=week&from=${weekFrom}&to=${weekTo}`).then(payload=>{if(!payload?.ok)throw new Error(payload?.error||'Google Sheets no devolvió la semana solicitada.');state.weekRecordsCache[weekKey]=(payload.records||[]).map(r=>{const parts=dateParts(r.date);return parts&&r.territory?{year:parts[0],month:parts[1],day:parts[2],shift:norm(r.shift),territory:norm(r.territory),department:norm(r.department)}:null;}).filter(Boolean);}).catch(err=>{$('tableCaption').textContent=`No se pudo consultar la semana ${selectedWeek}: ${err.message}`;}).finally(()=>{delete state.weekLoads[weekKey];if(state.weekRecordsCache[weekKey]&&state.selectedWeek===selectedWeek&&state.selectedWeekYear===currentISO.year)updateSummary();});
+      return;
+    }
     const previousDate=new Date(cutoffDate.getTime()-86400000), d1Key=dateKey(previousDate.getUTCFullYear(),previousDate.getUTCMonth()+1,previousDate.getUTCDate());
     $('d1ChartCaption').textContent=`${String(previousDate.getUTCDate()).padStart(2,'0')}/${String(previousDate.getUTCMonth()+1).padStart(2,'0')}/${previousDate.getUTCFullYear()} · turnos esperados del día anterior; NA se excluye.`;
-    $('tableCaption').textContent='El porcentaje semanal suma checks válidos ÷ turnos vencidos desde el lunes hasta el turno vigente. En cada celda de turno, pulsa para alternar entre el cálculo normal y NA (no esperado para ese territorio en ese día y turno); NA se guarda para todas las semanas.';
+    $('tableCaption').textContent=`Semana ${selectedWeek}: checks válidos ÷ turnos esperados${isCurrentWeek?' hasta el turno vigente':' de la semana completa'}. Pulsa cada celda de turno para alternar a NA; el ajuste se aplica a ese día y turno en todas las semanas.`;
     const checks=new Set();
-    for(const r of state.records){
+    for(const r of analysisRecords){
       const turn=shiftNumber(r.shift); if(!turn)continue;
       checks.add(`${normalizeKey(r.department)}|${normalizeKey(r.territory)}|${dateKey(r.year,r.month,r.day)}|${turn}`);
     }
