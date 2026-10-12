@@ -395,6 +395,7 @@
   const KEY='territorios-seguros-ubicaciones-v1';
   const REPORTS_KEY='territorio-seguro-reportes-v1';
   const OWNED_REPORTS_KEY='territorio-seguro-reportes-propios-v1';
+  const INVENTORY_CACHE_KEY='territorio-seguro-inventario-v1';
   const INVENTORY_URL='https://docs.google.com/spreadsheets/d/1vr3wyGQm6tsfP0mmg_dz_n6n5tCWa7VAj2YN8YK-3ts/gviz/tq';
   // URL de la aplicación web de Apps Script desplegada para este proyecto.
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
@@ -486,7 +487,7 @@
   function requestInventorySheet(){
     return new Promise((resolve,reject)=>{
       const callback=`inventoryCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`,script=document.createElement('script');
-      const timer=setTimeout(()=>finish(new Error('Tiempo de espera agotado al consultar la hoja INVENTARIO.')),20000);
+      const timer=setTimeout(()=>finish(new Error('La hoja INVENTARIO no respondió en 15 segundos. Revisa su acceso público y conexión.')),15000);
       function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}
       window[callback]=value=>finish(null,value);
       script.onerror=()=>finish(new Error('No se pudo consultar la hoja INVENTARIO de Google Sheets.'));
@@ -498,24 +499,26 @@
     if(inventoryLoadPromise)return inventoryLoadPromise;
     inventoryLoadPromise=(async()=>{
       try{
+        if(!state.inventoryLoaded){
+          try{const cached=JSON.parse(localStorage.getItem(INVENTORY_CACHE_KEY)||'null'),cachedRows=Array.isArray(cached?.rows)?cached.rows:[];if(cachedRows.length){applyInventoryRows(cachedRows);$('territoryHint').textContent='Mostrando el inventario guardado mientras se actualiza desde Google Sheets…';}}catch(_){}
+        }
         const payload=await requestInventorySheet();
         if(payload?.status==='error')throw new Error(payload.errors?.[0]?.detailed_message||'Google Sheets devolvió un error al leer INVENTARIO.');
         const rawRows=(payload?.table?.rows||[]).map(row=>({department:norm(row.c?.[0]?.v??row.c?.[0]?.f),territory:norm(row.c?.[1]?.v??row.c?.[1]?.f)})).filter(row=>row.department&&row.territory);
         const seen=new Set(),rowsFound=rawRows.filter(row=>{const key=`${normalizeKey(row.department)}|${normalizeKey(row.territory)}`;if(seen.has(key))return false;seen.add(key);return true;});
         if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió pares de Departamento y Territorio en las columnas A y C.');
-        state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
-        state.legacyPins=state.legacyPins.map(p=>{
-          if(p.department)return p;
-          const departments=[...new Set(rowsFound.filter(r=>normalizeKey(r.territory)===normalizeKey(p.territory)).map(r=>r.department))];
-          return {...p,department:departments.length===1?departments[0]:''};
-        });
-        populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();$('territoryHint').textContent='Departamentos y territorios actualizados desde Google Sheets · hoja INVENTARIO.';$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();return true;
+        applyInventoryRows(rowsFound);localStorage.setItem(INVENTORY_CACHE_KEY,JSON.stringify({rows:rowsFound,updatedAt:Date.now()}));$('territoryHint').textContent='Departamentos y territorios actualizados desde Google Sheets · hoja INVENTARIO.';return true;
       }catch(err){
         if(!state.inventoryLoaded){state.inventoryRows=[];state.territories=[];state.territoryRows=[];populateDepartments();populateLocationDepartments();setOptions($('departmentSelect'),[],'No disponible: revisa la hoja INVENTARIO');$('departmentSelect').disabled=true;updateTerritoryOptions();$('count').textContent='Inventario no disponible';render();}
         $('territoryHint').textContent=`No se pudieron actualizar los datos de INVENTARIO en Google Sheets: ${err.message}`;renderTerritoryList();return false;
       }finally{inventoryLoadPromise=null;}
     })();
     return inventoryLoadPromise;
+  }
+  function applyInventoryRows(rowsFound){
+    state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
+    state.legacyPins=state.legacyPins.map(p=>{if(p.department)return p;const departments=[...new Set(rowsFound.filter(r=>normalizeKey(r.territory)===normalizeKey(p.territory)).map(r=>r.department))];return {...p,department:departments.length===1?departments[0]:''};});
+    populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();
   }
   function updateTerritoryOptions(preserveSelection=true){
     const dept=$('departmentSelect').value, target=$('checkTerritory');
@@ -593,7 +596,7 @@
     m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return [+m[1],+m[2],+m[3]];
     return null;
   }
-  function jsonp(url){return new Promise((resolve,reject)=>{const callback='tsCallback_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script'),timer=setTimeout(()=>finish(new Error('Tiempo de espera agotado al consultar Google Sheets.')),20000);function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}window[callback]=value=>finish(null,value);script.onerror=()=>finish(new Error('No se pudo consultar el servicio de Google Sheets.'));script.src=`${url}${url.includes('?')?'&':'?'}callback=${callback}&_=${Date.now()}`;document.head.appendChild(script);});}
+  function jsonp(url){return new Promise((resolve,reject)=>{const callback='tsCallback_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script'),timer=setTimeout(()=>finish(new Error('Google Sheets no respondió en 15 segundos. Revisa la URL publicada y el acceso público del Apps Script.')),15000);function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}window[callback]=value=>finish(null,value);script.onerror=()=>finish(new Error('No se pudo consultar el servicio de Google Sheets.'));script.src=`${url}${url.includes('?')?'&':'?'}callback=${callback}&_=${Date.now()}`;document.head.appendChild(script);});}
   async function postShared(payload){const response=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});return response;}
   async function loadPublicData(){
     if(dataLoadPromise)return dataLoadPromise;
@@ -1046,7 +1049,8 @@
   window.addEventListener('resize',()=>{if(state.draggingPin)return;cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(render);},{passive:true});
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
-  loadInventoryData().then(()=>loadPublicData());
+  loadInventoryData();
+  loadPublicData();
   setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},8000);
   setInterval(()=>loadInventoryData(),300000);
 })();
