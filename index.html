@@ -47,6 +47,14 @@
     .map-controls .legend { margin-right:auto }
     .map-controls button { width:auto; min-height:34px; padding:6px 11px }
     .placement-hint { min-height:18px; padding:0 4px; color:var(--muted); font-size:12px }
+    .precision-controls { display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:8px 4px; border:1px solid var(--line); border-radius:8px; background:var(--surface-soft); }
+    .precision-controls[hidden] { display:none !important }
+    .precision-controls .nudge-pad { display:grid; grid-template-columns:repeat(3,36px); grid-template-rows:repeat(2,32px); gap:3px; }
+    .precision-controls button { width:auto; min-width:36px; min-height:32px; padding:3px 8px; }
+    .precision-controls .nudge-pad button:nth-child(1) { grid-column:2;grid-row:1 }
+    .precision-controls .nudge-pad button:nth-child(2) { grid-column:1;grid-row:2 }
+    .precision-controls .nudge-pad button:nth-child(3) { grid-column:2;grid-row:2 }
+    .precision-controls .nudge-pad button:nth-child(4) { grid-column:3;grid-row:2 }
     .territory-item:focus-visible,.map-controls button:focus-visible { outline:3px solid #80b7e1; outline-offset:2px }
     .location-form[hidden],.map-controls [hidden] { display:none !important }
     h2 { font-size:16px; margin:0 0 12px }
@@ -360,7 +368,18 @@
       <div class="placement-hint" id="placementHint" role="status"></div>
       <div class="map-wrap" id="mapWrap">
         <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
-        <svg id="overlay" viewBox="0 0 2048 1166" aria-label="Marcadores de ubicación"></svg>
+        <svg id="overlay" viewBox="0 0 2048 1166" preserveAspectRatio="none" aria-label="Marcadores de ubicación"></svg>
+      </div>
+      <div id="precisionControls" class="precision-controls" hidden aria-label="Ajuste preciso del semáforo">
+        <strong>Ajuste preciso:</strong>
+        <div class="nudge-pad" aria-label="Mover marcador">
+          <button type="button" data-nudge="0,-1" aria-label="Mover hacia arriba">↑</button>
+          <button type="button" data-nudge="-1,0" aria-label="Mover hacia la izquierda">←</button>
+          <button type="button" data-nudge="0,1" aria-label="Mover hacia abajo">↓</button>
+          <button type="button" data-nudge="1,0" aria-label="Mover hacia la derecha">→</button>
+        </div>
+        <label for="nudgeStep">Paso</label><select id="nudgeStep" aria-label="Precisión del ajuste"><option value="0.0025">Fino</option><option value="0.0005" selected>Muy fino</option><option value="0.0001">Milimétrico</option></select>
+        <span class="question-hint">Usa las flechas para ajustar la posición antes de confirmar.</span>
       </div>
       <div id="mapMessage" class="empty">Agrega una ubicación y asígnale un territorio. Los datos del panel se actualizan desde el archivo publicado.</div>
     </section>
@@ -714,10 +733,18 @@
       const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y',String(-13*unit));t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);if(draftStatus==='alert')appendDangerBadge(g,unit);svg.append(g);
     }
     $('mapWrap').style.cursor=state.locationDraft?.mode==='move'?'grab':state.placementMode?'crosshair':'default';
+    $('overlay').style.touchAction=state.placementMode?'none':'auto';
     $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 15 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
+    const draftHasPoint=state.locationDraft?.x!==null&&state.locationDraft?.x!==undefined&&state.locationDraft?.y!==null&&state.locationDraft?.y!==undefined;
+    $('precisionControls').hidden=!draftHasPoint||!$('locationForm').hidden;
+  }
+  function mapPointFromEvent(ev){
+    const svg=$('overlay'),point=svg.createSVGPoint();point.x=ev.clientX;point.y=ev.clientY;
+    const local=point.matrixTransform(svg.getScreenCTM().inverse());
+    return {x:Math.max(0,Math.min(1,local.x/2048)),y:Math.max(0,Math.min(1,local.y/1166))};
   }
   function resetLocationFlow(){
-    state.locationDraft=null;state.placementMode=false;state.draggingPin=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;$('deleteLocation').hidden=true;
+    state.locationDraft=null;state.placementMode=false;state.draggingPin=false;$('precisionControls').hidden=true;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;$('deleteLocation').hidden=true;
     $('deleteLocation').disabled=false;$('deleteLocation').textContent='Eliminar semáforo';
     $('locationDepartment').disabled=!state.inventoryLoaded;$('locationDepartment').value='';updateLocationTerritories();$('locationTerritory').value='';
     $('locateSemaphore').hidden=false;$('saveSemaphore').hidden=true;$('saveSemaphore').textContent='Guardar ubicación';$('confirmLocation').hidden=true;$('placementHint').textContent='';$('locationStatus').textContent='';render();
@@ -729,7 +756,7 @@
   function beginMoveFlow(pinId){
     const pin=state.pins.find(item=>item.id===pinId);if(!pin)return;
     resetLocationFlow();state.locationDraft={mode:'move',pinId:pin.id,department:pin.department,territory:pin.territory,x:Number(pin.x),y:Number(pin.y)};state.placementMode=true;
-    $('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=false;$('deleteLocation').hidden=false;$('confirmLocation').textContent='Confirmar ubicación';$('placementHint').textContent=`Arrastra el semáforo de ${pin.department} · ${pin.territory} hasta la posición correcta y confirma.`;render();
+    $('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=false;$('deleteLocation').hidden=false;$('confirmLocation').textContent='Confirmar ubicación';$('placementHint').textContent=`Arrastra el semáforo o usa las flechas de ajuste fino para ${pin.department} · ${pin.territory}.`;render();
   }
   $('addSemaphore').addEventListener('click',beginLocationFlow);
   $('locationDepartment').addEventListener('change',()=>{updateLocationTerritories();$('locationTerritory').value='';$('locateSemaphore').disabled=true;});
@@ -738,11 +765,11 @@
     const department=$('locationDepartment').value,territory=$('locationTerritory').value;
     if(!department||!territory)return;
     if(state.pins.some(p=>locationMatches(p,{department,territory}))){$('locationStatus').textContent='Ese territorio ya tiene un semáforo en el layout.';return;}
-    state.locationDraft={department,territory,x:null,y:null};state.placementMode=true;$('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=true;$('placementHint').textContent=`Haz clic en el layout para ubicar ${department} · ${territory}.`;$('locationStatus').textContent='';render();
+    state.locationDraft={mode:'add',department,territory,x:null,y:null};state.placementMode=true;$('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=true;$('placementHint').textContent=`Toca o haz clic en el layout para una posición aproximada; después podrás ajustarla con precisión.`;$('locationStatus').textContent='';render();
   });
   $('confirmLocation').addEventListener('click',()=>{
     if(!state.locationDraft||state.locationDraft.x===null||state.locationDraft.y===null)return;
-    state.placementMode=false;$('locationForm').hidden=false;
+    state.placementMode=false;$('locationForm').hidden=false;$('precisionControls').hidden=true;
     const moving=state.locationDraft.mode==='move';$('locationFormTitle').textContent=moving?'Modificar ubicación':'Confirmar semáforo';
     $('locationDepartment').value=state.locationDraft.department;$('locationTerritory').value=state.locationDraft.territory;
     $('locationDepartment').disabled=true;$('locationTerritory').disabled=true;$('locateSemaphore').hidden=true;$('saveSemaphore').hidden=false;$('saveSemaphore').textContent=moving?'Guardar nueva ubicación':'Guardar ubicación';$('confirmLocation').hidden=true;$('cancelPlacement').hidden=true;
@@ -974,17 +1001,16 @@
   $('overlay').addEventListener('click',ev=>{
     if(!state.placementMode||!state.locationDraft)return;
     if(state.locationDraft.mode==='move')return;
-    const rect=$('mapWrap').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
-    state.locationDraft.x=Math.max(0,Math.min(1,x));state.locationDraft.y=Math.max(0,Math.min(1,y));state.placementMode=false;$('confirmLocation').hidden=false;$('cancelPlacement').hidden=false;$('placementHint').textContent='Revisa la marca azul; pulsa “Confirmar ubicación” para regresar al formulario.';render();
-  });
+    ev.preventDefault();ev.stopImmediatePropagation();
+    const point=mapPointFromEvent(ev);state.locationDraft.x=point.x;state.locationDraft.y=point.y;state.placementMode=false;$('confirmLocation').hidden=false;$('cancelPlacement').hidden=false;$('placementHint').textContent='Ajusta la marca con las flechas si hace falta y luego pulsa “Confirmar ubicación”.';render();
+  },true);
   $('overlay').addEventListener('pointerdown',ev=>{
     if(!state.placementMode||state.locationDraft?.mode!=='move'||!ev.target.closest('[data-draft-pin]'))return;
     ev.preventDefault();state.draggingPin=true;$('overlay').setPointerCapture(ev.pointerId);
   });
   $('overlay').addEventListener('pointermove',ev=>{
     if(!state.draggingPin||!state.locationDraft)return;
-    const rect=$('mapWrap').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
-    state.locationDraft.x=Math.max(0,Math.min(1,x));state.locationDraft.y=Math.max(0,Math.min(1,y));
+    const point=mapPointFromEvent(ev);state.locationDraft.x=point.x;state.locationDraft.y=point.y;
     const marker=$('overlay').querySelector('[data-draft-pin]');if(marker)marker.setAttribute('transform',`translate(${state.locationDraft.x*2048},${state.locationDraft.y*1166})`);
   });
   $('overlay').addEventListener('pointerup',ev=>{
@@ -993,6 +1019,11 @@
     $('placementHint').textContent='Suelta el semáforo en el lugar correcto. Puedes seguir arrastrándolo o confirmar la ubicación.';
   });
   $('overlay').addEventListener('pointercancel',()=>{state.draggingPin=false;});
+  $('precisionControls').addEventListener('click',ev=>{
+    const button=ev.target.closest('[data-nudge]');if(!button||!state.locationDraft)return;
+    const [dx,dy]=button.dataset.nudge.split(',').map(Number),step=Number($('nudgeStep').value)||0.0005;
+    state.locationDraft.x=Math.max(0,Math.min(1,state.locationDraft.x+dx*step));state.locationDraft.y=Math.max(0,Math.min(1,state.locationDraft.y+dy*step));render();
+  });
   let resizeFrame=0;
   window.addEventListener('resize',()=>{if(state.draggingPin)return;cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(render);},{passive:true});
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
