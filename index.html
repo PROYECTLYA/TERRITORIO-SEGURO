@@ -235,7 +235,7 @@
       </section>
     </aside>
     <section class="map-card">
-      <div class="map-top"><h2>Plano general</h2><div class="map-controls"><span class="legend"><span style="color:#d92d20">● Riesgo Sí / sin registro</span> &nbsp; <span style="color:#159447">● Riesgo No</span></span><button id="deleteLocation" class="secondary" type="button" hidden>Eliminar semáforo</button><button id="cancelPlacement" class="secondary" type="button" hidden>Cancelar</button><button id="confirmLocation" type="button" hidden>Confirmar ubicación</button><button id="sidebarToggle" class="secondary" type="button">Ocultar lista</button></div></div>
+      <div class="map-top"><h2>Plano general</h2><div class="map-controls"><span class="legend"><span style="color:#159447">● Verde: No</span> &nbsp; <span style="color:#d92d20">● Rojo + !: Sí</span> &nbsp; <span style="color:#d92d20">● Rojo: sin check del turno</span></span><button id="deleteLocation" class="secondary" type="button" hidden>Eliminar semáforo</button><button id="cancelPlacement" class="secondary" type="button" hidden>Cancelar</button><button id="confirmLocation" type="button" hidden>Confirmar ubicación</button><button id="sidebarToggle" class="secondary" type="button">Ocultar lista</button></div></div>
       <div class="placement-hint" id="placementHint" role="status"></div>
       <div class="map-wrap" id="mapWrap">
         <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
@@ -258,7 +258,7 @@
   const INVENTORY_URL='https://docs.google.com/spreadsheets/d/1vr3wyGQm6tsfP0mmg_dz_n6n5tCWa7VAj2YN8YK-3ts/gviz/tq';
   // URL de la aplicación web de Apps Script desplegada para este proyecto.
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
-  let dataLoadPromise=null,inventoryLoadPromise=null;
+  let dataLoadPromise=null,inventoryLoadPromise=null,renderTurnWindow=null;
   const $=id=>document.getElementById(id);
   const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
   try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
@@ -521,34 +521,61 @@
       }).join('')}</section>`;
     }).join('');
   }
+  function currentTurnWindow(){
+    const timeZone='America/Mexico_City';
+    const partsFor=instant=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric',hourCycle:'h23'}).formatToParts(instant).map(part=>[part.type,part.value]));
+    const now=new Date(),local=partsFor(now),hour=+local.hour;
+    let shift,startHour;
+    if(hour>=22){shift=1;startHour=22;}
+    else if(hour<6){shift=1;startHour=22;}
+    else if(hour<14){shift=2;startHour=6;}
+    else{shift=3;startHour=14;}
+    const startDate=new Date(Date.UTC(+local.year,+local.month-1,+local.day));
+    if(hour<6)startDate.setUTCDate(startDate.getUTCDate()-1);
+    const localWallAsUtc=Date.UTC(startDate.getUTCFullYear(),startDate.getUTCMonth(),startDate.getUTCDate(),startHour);
+    const rendered=partsFor(new Date(localWallAsUtc));
+    const renderedWallAsUtc=Date.UTC(+rendered.year,+rendered.month-1,+rendered.day,+rendered.hour,+rendered.minute,+rendered.second);
+    const startsAt=localWallAsUtc+(localWallAsUtc-renderedWallAsUtc);
+    return {shift,startsAt,now:now.getTime()};
+  }
   function pinRiskStatus(department,territory){
+    const turn=renderTurnWindow||currentTurnWindow();
     const checks=state.googleChecks.filter(r=>{
       const rowTerritory=norm(r.territory??r.territorio??r.area);
       const rowDepartment=norm(r.department??r.departamento??r.depto);
       if(normalizeKey(rowTerritory)!==normalizeKey(territory))return false;
-      return !rowDepartment||normalizeKey(rowDepartment)===normalizeKey(department);
-    }).sort((a,b)=>String(b.timestamp||b.date||'').localeCompare(String(a.timestamp||a.date||'')));
+      if(rowDepartment&&normalizeKey(rowDepartment)!==normalizeKey(department))return false;
+      const timestamp=Date.parse(r.timestamp||'');
+      return shiftNumber(r.shift??r.turno)===turn.shift&&Number.isFinite(timestamp)&&timestamp>=turn.startsAt&&timestamp<=turn.now;
+    }).sort((a,b)=>Date.parse(b.timestamp||'')-Date.parse(a.timestamp||''));
     if(!checks.length)return 'risk';
-    return normalizeKey(checks[0].imminentRisk??checks[0].pregunta15??checks[0].q15)==='no'?'safe':'risk';
+    return normalizeKey(checks[0].imminentRisk??checks[0].pregunta15??checks[0].q15)==='no'?'safe':'alert';
+  }
+  function appendDangerBadge(group){
+    const badge=document.createElementNS('http://www.w3.org/2000/svg','circle');badge.setAttribute('cx','15');badge.setAttribute('cy','-14');badge.setAttribute('r','8');badge.setAttribute('fill','#d92d20');badge.setAttribute('stroke','white');badge.setAttribute('stroke-width','2');
+    const mark=document.createElementNS('http://www.w3.org/2000/svg','text');mark.setAttribute('x','15');mark.setAttribute('y','-10');mark.style.fill='white';mark.style.stroke='none';mark.style.fontSize='12px';mark.style.fontWeight='800';mark.style.textAnchor='middle';mark.textContent='!';
+    group.append(badge,mark);
   }
   function render(){
+    renderTurnWindow=currentTurnWindow();
     const svg=$('overlay'); svg.innerHTML='';
     for(const p of state.pins){
       if(state.locationDraft?.mode==='move'&&p.id===state.locationDraft.pinId)continue;
       const status=pinRiskStatus(p.department,p.territory), color=status==='safe'?colors.done:colors.missing;
       const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','pin'+(p.id===state.selected?' selected':'')); g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`); g.dataset.id=p.id;
       const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('r','13'); c.setAttribute('fill',color); c.style.color=color; c.setAttribute('class','blink');
-      const t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('y','-19'); t.textContent=p.territory; g.setAttribute('aria-label',`${p.department} · ${p.territory}`);
-      g.append(c,t); g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;}); svg.append(g);
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('y','-19'); t.textContent=p.territory; g.setAttribute('aria-label',`${p.department} · ${p.territory} · ${status==='safe'?'sin riesgo reportado en el turno actual':status==='alert'?'peligro reportado en el turno actual':'sin check en el turno actual'}`);
+      g.append(c,t);if(status==='alert')appendDangerBadge(g);g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;}); svg.append(g);
     }
     if(state.locationDraft?.x!==undefined&&state.locationDraft?.x!==null){
       const p=state.locationDraft,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','pin selected');g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`);
-      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r','13');c.setAttribute('fill',p.mode==='move'?(pinRiskStatus(p.department,p.territory)==='safe'?colors.done:colors.missing):colors.unmapped);c.setAttribute('class','blink');
-      if(p.mode==='move'){g.dataset.draftPin='true';g.style.cursor='grab';}
-      const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y','-19');t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);svg.append(g);
+      const draftStatus=p.mode==='move'?pinRiskStatus(p.department,p.territory):'draft';
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r','13');c.setAttribute('fill',draftStatus==='safe'?colors.done:draftStatus==='draft'?colors.unmapped:colors.missing);c.setAttribute('class','blink');
+      if(p.mode==='move'){g.dataset.draftPin='true';g.style.cursor='grab';g.style.touchAction='none';}
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y','-19');t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);if(draftStatus==='alert')appendDangerBadge(g);svg.append(g);
     }
     $('mapWrap').style.cursor=state.locationDraft?.mode==='move'?'grab':state.placementMode?'crosshair':'default';
-    $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) leídos de Google Sheets. Verde intermitente = la respuesta más reciente a la pregunta 15 fue No; rojo intermitente = Sí o sin registro.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
+    $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 15 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
   }
   function resetLocationFlow(){
     state.locationDraft=null;state.placementMode=false;state.draggingPin=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;$('deleteLocation').hidden=true;
