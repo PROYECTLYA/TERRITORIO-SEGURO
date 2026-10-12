@@ -400,7 +400,7 @@
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
   let dataLoadPromise=null,inventoryLoadPromise=null,renderTurnWindow=null;
   const $=id=>document.getElementById(id);
-  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], initialRange:null,weekRecordsCache:{},weekLoads:{},historicalReports:[],googleChecks:[],shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
+  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], initialRange:null,weekRecordsCache:{},weekLoads:{},historicalReports:[],googleChecks:[],shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[],pendingLocationSaves:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
   try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
   const hadOwnershipList=localStorage.getItem(OWNED_REPORTS_KEY)!==null;
   try { const own=JSON.parse(localStorage.getItem(OWNED_REPORTS_KEY)||'null');state.ownedReportIds=new Set(Array.isArray(own)?own:state.userReports.map(r=>r.id).filter(Boolean)); } catch { state.ownedReportIds=new Set(state.userReports.map(r=>r.id).filter(Boolean)); }
@@ -616,7 +616,10 @@
             state.sharedMigrationDone=reportsSynced&&locationsSynced;
           }
           state.userReports=Array.isArray(payload.reports)?payload.reports:[];
-          state.pins=Array.isArray(payload.locations)?payload.locations:[];
+          const remoteLocations=Array.isArray(payload.locations)?payload.locations:[];
+          state.pendingLocationSaves=state.pendingLocationSaves.filter(pending=>!remoteLocations.some(remote=>locationMatches(remote,pending)&&Math.abs(Number(remote.x)-Number(pending.x))<1e-6&&Math.abs(Number(remote.y)-Number(pending.y))<1e-6));
+          state.pins=[...remoteLocations];
+          for(const pending of state.pendingLocationSaves){const index=state.pins.findIndex(remote=>String(remote.id)===String(pending.id)||locationMatches(remote,pending));if(index<0)state.pins.push(pending);else state.pins[index]=pending;}
           state.shiftExemptions=new Set(payload.shiftExemptions.filter(item=>item?.notApplicable).map(item=>shiftExemptionKey(item.department,item.territory,Number(item.weekday),Number(item.shift))));
           if(state.sharedMigrationDone)localStorage.setItem(KEY,JSON.stringify(state.pins));
           persistReports();
@@ -626,7 +629,7 @@
         state.records=records;state.initialRange=payload.range||null;state.googleChecks=payload.statuses||[];state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas del periodo reciente`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
-        $('recordStatus').textContent=state.sharedMigrationDone?'Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 15 segundos.':'Conexión compartida activa. Sincronizando ubicaciones y registros guardados anteriormente en este navegador…';
+        $('recordStatus').textContent=state.sharedMigrationDone?'Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 8 segundos.':'Conexión compartida activa. Sincronizando ubicaciones y registros guardados anteriormente en este navegador…';
         render();renderTerritoryList();updateSummary();return true;
       }catch(err){
         $('bookStatus').textContent=`No se pudieron cargar los datos: ${err.message}`;
@@ -643,6 +646,20 @@
       if(loaded&&(!isConfirmed||isConfirmed()))return true;
       if(attempt<3)await new Promise(resolve=>setTimeout(resolve,750));
     }
+    return false;
+  }
+  async function verifySavedLocation(pin){
+    let lastError='La escritura no apareció en la consulta de ubicaciones.';
+    for(let attempt=0;attempt<4;attempt++){
+      if(attempt)await new Promise(resolve=>setTimeout(resolve,900));
+      try{
+        const payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=locations`);
+        if(!payload?.ok)throw new Error(payload?.error||lastError);
+        const saved=(payload.locations||[]).find(item=>locationMatches(item,pin)&&Math.abs(Number(item.x)-Number(pin.x))<1e-6&&Math.abs(Number(item.y)-Number(pin.y))<1e-6);
+        if(saved){state.pendingLocationSaves=state.pendingLocationSaves.filter(item=>String(item.id)!==String(pin.id));state.pins=payload.locations;localStorage.setItem(KEY,JSON.stringify(state.pins));render();renderTerritoryList();renderHome();return true;}
+      }catch(err){lastError=err.message||lastError;}
+    }
+    $('bookStatus').textContent=`La ubicación se envió, pero Google Sheets aún no la confirma: ${lastError}`;
     return false;
   }
   function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -734,7 +751,7 @@
     }
     $('mapWrap').style.cursor=state.locationDraft?.mode==='move'?'grab':state.placementMode?'crosshair':'default';
     $('overlay').style.touchAction=state.placementMode?'none':'auto';
-    $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 15 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
+    $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 8 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
     const draftHasPoint=state.locationDraft?.x!==null&&state.locationDraft?.x!==undefined&&state.locationDraft?.y!==null&&state.locationDraft?.y!==undefined;
     $('precisionControls').hidden=!draftHasPoint||!$('locationForm').hidden;
   }
@@ -784,10 +801,11 @@
     }else pin={id:crypto.randomUUID(),x:draft.x,y:draft.y,department:draft.department,territory:draft.territory,name:draft.territory};
     try{
       await postShared({action:'saveLocation',location:pin});
-      const matchesSavedPosition=()=>state.pins.some(item=>locationMatches(item,pin)&&Math.abs(Number(item.x)-Number(pin.x))<1e-6&&Math.abs(Number(item.y)-Number(pin.y))<1e-6);
-      const refreshed=await refreshSharedData(matchesSavedPosition);
-      if(!refreshed)throw new Error('La ubicación no apareció en la consulta compartida. Verifica que el despliegue activo de Code.gs incluya la acción saveLocation y tenga permiso para editar la hoja.');
+      state.pendingLocationSaves=state.pendingLocationSaves.filter(item=>!locationMatches(item,pin));state.pendingLocationSaves.push(pin);
+      const localIndex=state.pins.findIndex(item=>String(item.id)===String(pin.id)||locationMatches(item,pin));if(localIndex<0)state.pins.push(pin);else state.pins[localIndex]=pin;
       localStorage.setItem(KEY,JSON.stringify(state.pins));state.selected=null;renderTerritoryList();renderHome();resetLocationFlow();
+      $('recordStatus').textContent='Ubicación enviada a Google Sheets. La verificación se realiza en segundo plano; la actualización compartida es cada 8 segundos.';
+      void verifySavedLocation(pin);
     }catch(err){button.disabled=false;button.textContent=draft.mode==='move'?'Guardar nueva ubicación':'Guardar ubicación';$('locationStatus').textContent=`No se pudo guardar la ubicación compartida: ${err.message}`;render();}
   });
   $('cancelSemaphore').addEventListener('click',resetLocationFlow);
@@ -1029,7 +1047,7 @@
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
   loadInventoryData().then(()=>loadPublicData());
-  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},15000);
+  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},8000);
   setInterval(()=>loadInventoryData(),300000);
 })();
 </script>
