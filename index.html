@@ -215,6 +215,8 @@
   <main id="mapView">
     <aside id="territorySidebar" class="territory-sidebar" aria-label="Lista de territorios">
       <div class="territory-sidebar-head"><div><h2>Territorios</h2><p>Verde claro: ubicado en el layout · Rojo: pendiente de ubicar</p></div></div>
+      <label for="territoryDepartmentFilter">Departamento</label>
+      <select id="territoryDepartmentFilter" aria-label="Filtrar territorios por departamento"><option value="">Selecciona un departamento</option></select>
       <div id="territoryList" class="territory-list" role="list" aria-live="polite"><div class="empty">Cargando departamentos y territorios…</div></div>
       <div class="territory-legend"><span>● Ubicado</span><span>● Sin ubicar</span></div>
       <div class="territory-data-status"><span id="count" class="pill">Cargando datos</span><div id="bookStatus" class="status">Conectando con Google Sheets…</div><div id="recordStatus" class="status">Esperando checks de territorio…</div></div>
@@ -512,15 +514,19 @@
     if(!state.inventoryLoaded){container.innerHTML='<div class="empty">No se pudo cargar el inventario de territorios.</div>';return;}
     const departments=uniqueDepartments(state.inventoryRows);
     if(!departments.length){container.innerHTML='<div class="empty">El inventario no contiene departamentos.</div>';return;}
-    container.innerHTML=departments.map(department=>{
-      const territories=[...new Set(state.inventoryRows.filter(r=>normalizeKey(r.department)===normalizeKey(department)).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
-      return `<section class="territory-department"><h3>${esc(department)}</h3>${territories.map(territory=>{
-        const pin=state.pins.find(p=>locationMatches(p,{department,territory}));
-        const label=`<span class="territory-status-dot" aria-hidden="true">●</span><span>${esc(territory)}</span>`;
-        return pin?`<div class="territory-row"><button type="button" class="territory-item located has-pin" data-pin-id="${esc(pin.id)}" aria-label="${esc(department)}: ${esc(territory)}, ubicado en el layout">${label}</button><button type="button" class="modify-pin-button" data-move-pin="${esc(pin.id)}">Modificar ubicación</button></div>`:`<div class="territory-item not-located" role="listitem">${label}</div>`;
-      }).join('')}</section>`;
-    }).join('');
+    const select=$('territoryDepartmentFilter'),previous=select.value;
+    setOptions(select,departments,'Selecciona un departamento');
+    if(departments.some(department=>normalizeKey(department)===normalizeKey(previous)))select.value=departments.find(department=>normalizeKey(department)===normalizeKey(previous));
+    const department=select.value;
+    if(!department){container.innerHTML='<div class="empty">Selecciona un departamento para ver sus territorios.</div>';return;}
+    const territories=[...new Set(state.inventoryRows.filter(r=>normalizeKey(r.department)===normalizeKey(department)).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
+    container.innerHTML=territories.map(territory=>{
+      const pin=state.pins.find(p=>locationMatches(p,{department,territory}));
+      const label=`<span class="territory-status-dot" aria-hidden="true">●</span><span>${esc(territory)}</span>`;
+      return pin?`<div class="territory-row"><button type="button" class="territory-item located has-pin" data-pin-id="${esc(pin.id)}" aria-label="${esc(department)}: ${esc(territory)}, ubicado en el layout">${label}</button><button type="button" class="modify-pin-button" data-move-pin="${esc(pin.id)}">Modificar ubicación</button></div>`:`<div class="territory-item not-located" role="listitem">${label}</div>`;
+    }).join('')||'<div class="empty">Este departamento no tiene territorios en el inventario.</div>';
   }
+  $('territoryDepartmentFilter').addEventListener('change',renderTerritoryList);
   function currentTurnWindow(){
     const timeZone='America/Mexico_City';
     const partsFor=instant=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric',hourCycle:'h23'}).formatToParts(instant).map(part=>[part.type,part.value]));
@@ -579,6 +585,7 @@
   }
   function resetLocationFlow(){
     state.locationDraft=null;state.placementMode=false;state.draggingPin=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;$('deleteLocation').hidden=true;
+    $('deleteLocation').disabled=false;$('deleteLocation').textContent='Eliminar semáforo';
     $('locationDepartment').disabled=!state.inventoryLoaded;$('locationDepartment').value='';updateLocationTerritories();$('locationTerritory').value='';
     $('locateSemaphore').hidden=false;$('saveSemaphore').hidden=true;$('saveSemaphore').textContent='Guardar ubicación';$('confirmLocation').hidden=true;$('placementHint').textContent='';$('locationStatus').textContent='';render();
   }
