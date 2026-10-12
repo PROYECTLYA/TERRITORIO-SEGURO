@@ -2,13 +2,14 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Ubicación de territorios seguros</title>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
-    :root { color-scheme: light; --ink:#182230; --muted:#637083; --blue:#1769aa; --line:#d8e0e9; }
+    :root { color-scheme:light; --ink:#182230; --muted:#637083; --blue:#1769aa; --line:#d8e0e9; --page:#f3f6fa; --surface:#fff; --surface-soft:#f7f8fa; --surface-muted:#eef3f8; --table-head:#eef3f7; --table-row:#e7eef5; }
     * { box-sizing:border-box }
-    body { margin:0; background:#f3f6fa; color:var(--ink); font:15px/1.45 "Segoe UI",Arial,sans-serif }
+    html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+    body { margin:0; min-width:320px; min-height:100vh; min-height:100dvh; overflow-x:hidden; background:#f3f6fa; color:var(--ink); font:15px/1.45 "Segoe UI",Arial,sans-serif }
     header { padding:16px 26px; background:#123e32; color:white; position:sticky; top:0; z-index:20; box-shadow:0 3px 12px #1028202b }
     header h1 { margin:0 0 4px; font-size:22px }
     header p { margin:0; color:#d6e8e0 }
@@ -21,11 +22,11 @@
     main.full-view aside { display:none }
     aside,.map-card { background:white; border:1px solid var(--line); border-radius:12px; box-shadow:0 4px 18px #16324f0b }
     aside { padding:18px; position:sticky; top:12px }
-    .territory-sidebar { min-width:0; max-height:calc(100vh - 24px); display:flex; flex-direction:column; gap:12px; overflow:auto }
+    .territory-sidebar { min-width:0; max-height:calc(100vh - 24px); max-height:calc(100dvh - 24px); display:flex; flex-direction:column; gap:12px; overflow:auto; overscroll-behavior:contain; }
     .territory-sidebar-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px }
     .territory-sidebar-head h2 { margin:0 0 4px }
     .territory-sidebar-head p { margin:0; color:var(--muted); font-size:12px }
-    .territory-list { overflow:auto; min-height:120px; max-height:calc(100vh - 270px); padding-right:3px }
+    .territory-list { overflow:auto; min-height:120px; max-height:calc(100vh - 270px); max-height:calc(100dvh - 270px); padding-right:3px; overscroll-behavior:contain; -webkit-overflow-scrolling:touch }
     .territory-department { margin:0 0 12px }
     .territory-department h3 { margin:0 0 5px; font-size:14px; color:#172b22 }
     .territory-item { width:100%; min-height:30px; display:flex; align-items:center; gap:8px; padding:4px 6px; border:0; border-radius:5px; background:transparent; color:#b42318; font-size:12px; font-weight:500; text-align:left; cursor:default }
@@ -100,7 +101,7 @@
     .area-chart-wrap { overflow-x:auto; overflow-y:hidden; margin-top:8px }
     .area-chart-wrap svg { position:static; display:block; height:325px; overflow:visible }
     .chart-legend { font-size:12px; color:var(--muted); margin-top:4px }
-    .table-wrap { overflow:auto; max-height:72vh; border:1px solid var(--line); border-radius:8px; margin-top:13px }
+    .table-wrap { overflow:auto; max-height:72vh; max-height:72dvh; border:1px solid var(--line); border-radius:8px; margin-top:13px; overscroll-behavior:contain; -webkit-overflow-scrolling:touch }
     .weekly-table { border-collapse:separate; border-spacing:0; white-space:nowrap; font-size:12px; width:max-content; min-width:100% }
     .weekly-table th,.weekly-table td { padding:7px 8px; text-align:center; border-right:1px solid #e7ecf1; border-bottom:1px solid #e7ecf1 }
     .weekly-table thead th { background:#eef3f7; position:sticky; top:0; z-index:3 }
@@ -113,6 +114,14 @@
     .weekly-table .namecol.c3 { left:280px }
     .weekly-table th.namecol { min-width:140px }
     .weekly-table td.rate { font-weight:700; font-variant-numeric:tabular-nums }
+    .weekly-table .shift-slot { width:100%; min-width:34px; min-height:32px; padding:3px 6px; border:0; border-radius:4px; background:transparent; color:inherit; font:700 12px "Segoe UI",Arial,sans-serif; cursor:pointer; }
+    .weekly-table .shift-slot.good { color:#137c42; background:#eff9f2; }
+    .weekly-table .shift-slot.bad { color:#bd2b24; background:#fff1f0; }
+    .weekly-table .shift-slot.na { color:#475467; background:#e9edf2; }
+    .weekly-table .shift-slot.future { color:#697586; background:#f3f5f7; }
+    .weekly-table .shift-slot:hover { filter:brightness(.96); }
+    .weekly-table .shift-slot:focus-visible { outline:3px solid #80b7e1; outline-offset:1px; }
+    .weekly-table td.na-cell { color:#475467; background:#e9edf2; font-weight:700; }
     .weekly-table .area-row td { background:#e7eef5; color:#183b58; font-weight:750; border-top:2px solid #c8d4e0 }
     .weekly-table .area-row td:first-child { text-align:left }
     .weekly-table td.good { color:#137c42; background:#eff9f2 }
@@ -123,7 +132,7 @@
     .table-actions button,.day-toggle { width:auto; min-height:34px; padding:6px 10px; background:white; color:#223247; border:1px solid #c8d2de; border-radius:7px; font:600 12px "Segoe UI",Arial,sans-serif; cursor:pointer }
     .weekly-table .day-head { white-space:nowrap }
     .weekly-table .day-toggle { margin-left:7px; min-width:26px; min-height:24px; padding:1px 6px; line-height:1 }
-    .table-toolbar input { width:min(280px,100%); min-height:36px }
+    .table-toolbar input,.table-toolbar select { width:min(280px,100%); min-height:36px }
     .empty-summary { padding:34px 16px; text-align:center; color:var(--muted) }
     .views { flex-wrap:wrap }
     .views button { min-height:38px }
@@ -168,7 +177,7 @@
     .field-title { font-weight:650; font-size:14px }
     .choice-row { display:flex; flex-wrap:wrap; gap:9px 22px; padding:7px 0 }
     .choice-row label { display:flex; align-items:center; gap:8px; font-weight:400 }
-    .matrix-scroll { overflow:auto }
+    .matrix-scroll { overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch }
     .matrix { min-width:650px; display:grid; grid-template-columns:minmax(250px,1fr) repeat(3,76px); align-items:stretch }
     .matrix-head,.matrix-question,.matrix-cell { padding:10px 8px; border-bottom:1px solid #e8edf2 }
     .matrix-head { text-align:center; font-weight:700; background:#f2f5f8 }
@@ -181,6 +190,116 @@
     @media(max-width:850px) { .workspace-grid { grid-template-columns:1fr } }
     @media(max-width:850px) { main { grid-template-columns:1fr } aside { position:static } }
     @media(max-width:650px) { .summary-cards { grid-template-columns:1fr } .bar-row { grid-template-columns:86px minmax(50px,1fr) 50px } .weekly-table .namecol.c2 { left:115px } .weekly-table .namecol.c3 { left:230px } .weekly-table th.namecol { min-width:115px } }
+    @media(max-width:850px) {
+      main { gap:12px; padding:12px }
+      aside { top:auto }
+      .territory-sidebar { max-height:none; overflow:visible }
+      .territory-list { max-height:38vh; max-height:38dvh; }
+      .map-card { padding:8px; }
+      .workspace-view,.summary-view { padding:16px; }
+    }
+    @media(max-width:700px) {
+      header { position:relative; top:auto; padding: max(12px, env(safe-area-inset-top, 0px)) 14px 12px; }
+      header h1 { font-size:20px; }
+      header p { font-size:14px; }
+      .views { flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; gap:7px; margin:10px -2px 0; padding:0 2px 5px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
+      .views button { flex:0 0 auto; min-height:44px; padding:8px 12px; white-space:nowrap; scroll-snap-align:start; }
+      main { gap:10px; padding:10px 10px calc(14px + env(safe-area-inset-bottom, 0px)); }
+      .territory-sidebar { gap:10px; padding:14px; }
+      .territory-list { max-height:34vh; max-height:34dvh; min-height:80px; }
+      .territory-item { min-height:40px; font-size:14px; }
+      .modify-pin-button { min-height:40px; font-size:12px; }
+      .map-card { padding:7px; border-radius:9px; }
+      .map-top { align-items:stretch; flex-direction:column; gap:8px; padding:3px 3px 8px; }
+      .map-controls { justify-content:stretch; gap:6px; }
+      .map-controls .legend { flex:1 0 100%; margin:0; line-height:1.55; }
+      .map-controls button { flex:1 1 calc(50% - 6px); width:auto; min-height:44px; padding:8px; white-space:normal; }
+      .placement-hint { line-height:1.4; }
+      .workspace-view,.summary-view { padding:12px; }
+      .workspace-head { align-items:stretch; }
+      .workspace-head h2,.summary-head h2 { font-size:20px; }
+      .summary-head { align-items:flex-start; }
+      .summary-cards { grid-template-columns:1fr; gap:10px; }
+      .metric,.panel,.check-card,.form-card,.records-card { padding:14px; }
+      .field-grid,.form-row,.filters { grid-template-columns:minmax(0,1fr); }
+      .check-card h3 { font-size:15px; line-height:1.4; }
+      .choice-row { gap:12px 20px; }
+      .choice-row label { min-height:44px; }
+      .matrix { min-width:610px; grid-template-columns:minmax(250px,1fr) repeat(3,72px); }
+      .matrix-question { font-size:12px; }
+      .records-toolbar { display:grid; grid-template-columns:minmax(0,1fr); }
+      .records-toolbar input,.records-toolbar select { min-width:0; width:100%; min-height:44px; }
+      .report-item { grid-template-columns:minmax(0,1fr); }
+      .report-actions { flex-wrap:wrap; }
+      .report-actions button { min-height:40px; }
+      .table-toolbar { align-items:stretch; }
+      .table-actions { display:grid; grid-template-columns:minmax(0,1fr); width:100%; }
+      .table-actions button,.table-toolbar input,.table-toolbar select { width:100%; min-height:44px; }
+      .table-wrap { max-height:68vh; max-height:68dvh; }
+      .weekly-table .namecol { position:static; }
+      .weekly-table th.namecol { min-width:110px; }
+      .weekly-table .namecol.c2,.weekly-table .namecol.c3 { left:auto; }
+    }
+    @media(max-width:400px) {
+      header { padding-left:11px; padding-right:11px; }
+      .views button { font-size:13px; padding-left:10px; padding-right:10px; }
+      main { padding-left:7px; padding-right:7px; }
+      .territory-sidebar { padding:12px; }
+      .map-controls button { flex-basis:100%; }
+      .check-card,.metric,.panel,.records-card { padding:12px; }
+      .weekly-table { font-size:11px; }
+    }
+    @media(prefers-reduced-motion:reduce) {
+      *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    }
+    @media(prefers-color-scheme:dark) {
+      :root { color-scheme:dark; --ink:#e6edf5; --muted:#a9b5c5; --blue:#2486c7; --line:#3b4a5c; --page:#111923; --surface:#1b2633; --surface-soft:#202d3b; --surface-muted:#263545; --table-head:#263545; --table-row:#2a3a4a; }
+      body { background:var(--page); color:var(--ink); }
+      header { background:#082f28; box-shadow:0 3px 14px #0007; }
+      header p { color:#c6ddd4; }
+      aside,.map-card,.metric,.panel,.form-card,.records-card,.check-card { background:var(--surface); border-color:var(--line); box-shadow:0 4px 18px #0002; }
+      h1,h2,h3,.field-title,.report-title,.location-form h3,.territory-department h3 { color:var(--ink); }
+      .territory-sidebar-head p,.summary-note,.metric-label,.legend,.hint,.status,.question-hint,.chart-legend,.placement-hint { color:var(--muted); }
+      input,select,textarea { background:#202c39; color:var(--ink); border-color:#4a5b6e; color-scheme:dark; }
+      input::placeholder,textarea::placeholder { color:#a0adbc; opacity:1; }
+      input:focus,select:focus,textarea:focus,button:focus-visible { outline-color:#71baff; }
+      button.secondary,.modify-pin-button,.table-actions button,.table-toolbar input,.table-toolbar select,.weekly-table .day-toggle { background:#202c39; color:var(--ink); border-color:#4a5b6e; }
+      .views button { background:#ffffff12; border-color:#ffffff50; color:#f4f7fa; }
+      .views button.active { background:#e5f4ed; color:#103b30; }
+      .territory-item.located { color:#71d69d; }
+      .territory-item:not(.located) { color:#ff8178; }
+      .territory-item.has-pin:hover,.modify-pin-button:hover { background:#253b36; }
+      .territory-legend { color:var(--muted); }
+      .pill { background:#263545; color:#d9e4ef; }
+      .weekly-table th,.weekly-table td { border-color:#3a4857; }
+      .weekly-table thead th,.matrix-head { background:var(--table-head); color:var(--ink); }
+      .weekly-table .namecol { background:var(--surface); color:var(--ink); }
+      .weekly-table thead .namecol { background:var(--table-head); }
+      .weekly-table .area-row td { background:var(--table-row); color:#dbe9f6; border-top-color:#526579; }
+      .weekly-table td.good { color:#7de0a4; background:#173a2c; }
+      .weekly-table td.bad { color:#ff9991; background:#402522; }
+      .weekly-table td.future { background:#202a35; color:#a0adbc; }
+      .weekly-table .shift-slot.good { color:#7de0a4; background:#173a2c; }
+      .weekly-table .shift-slot.bad { color:#ff9991; background:#402522; }
+      .weekly-table tr:nth-child(even) td:not(.namecol):not(.good):not(.bad):not(.future) { background:#1e2a37; }
+      .matrix-head,.matrix-question,.matrix-cell { border-color:#344353; }
+      .matrix-row:nth-child(6n+1) { background:#202d3b; }
+      .report-item { border-color:var(--line); }
+      .report-meta,.report-answers { color:var(--muted); }
+      .report-answers li strong { color:var(--ink); }
+      .risk-chip { background:#402522; color:#ff9991; }
+      .risk-chip.low { background:#173a2c; color:#7de0a4; }
+      .risk-chip.medium { background:#3b301b; color:#ffcf70; }
+      .empty,.empty-summary,.empty-reports { color:var(--muted); }
+      .bar-track { background:#2b3948; }
+      .bar-label { color:#d6e0eb; }
+      .area-chart-wrap svg text { fill:#e6edf5 !important; }
+      .area-chart-wrap svg line { stroke:#8291a2 !important; }
+      .weekly-table td.na-cell { background:#2a3440; color:#c1ccd8; }
+      .shift-slot.na { background:#374555; color:#d1dbe5; }
+      .shift-slot.future { background:#26313e; color:#aab6c4; }
+      ::selection { background:#285b7d; color:white; }
+    }
   </style>
 </head>
 <body>
@@ -248,9 +367,9 @@
   </main>
   <section id="summaryView" class="summary-view" hidden>
     <div class="summary-head"><div><h2>Análisis detallado de reportes</h2><div id="summaryContext" class="summary-note">Conectando con los datos publicados…</div></div><div class="summary-note">Turnos: 1.º 22:00–06:00 · 2.º 06:00–14:00 · 3.º 14:00–22:00</div></div>
-    <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Territorios en la lista</div><div class="metric-value" id="totalTerritories">—</div></div><div class="metric metric-good"><div class="metric-label">Cumplen todos los turnos transcurridos</div><div class="metric-value" id="compliantTerritories">—</div></div><div class="metric metric-bad"><div class="metric-label">Con reportes pendientes</div><div class="metric-value" id="pendingTerritories">—</div></div></div>
+    <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Territorios con turnos esperados</div><div class="metric-value" id="totalTerritories">—</div></div><div class="metric metric-good"><div class="metric-label">Cumplen todos los turnos transcurridos</div><div class="metric-value" id="compliantTerritories">—</div></div><div class="metric metric-bad"><div class="metric-label">Con reportes pendientes</div><div class="metric-value" id="pendingTerritories">—</div></div></div>
     <div class="area-charts"><div class="panel"><h3>Cumplimiento Semanal</h3><div id="weeklyChartCaption" class="summary-note">Acumulado hasta el día y turno vigente, agrupado por área.</div><div id="weeklyAreaChart" class="area-chart-wrap"><div class="empty-summary">Cargando datos publicados…</div></div><div class="chart-legend">Rojo: menor de 80% · Amarillo: 80–89% · Verde: 90% o más</div></div><div class="panel"><h3>D-1</h3><div id="d1ChartCaption" class="summary-note">Cumplimiento del día calendario anterior, considerando sus tres turnos.</div><div id="d1AreaChart" class="area-chart-wrap"><div class="empty-summary">Cargando datos publicados…</div></div><div class="chart-legend">Rojo: menor de 80% · Amarillo: 80–89% · Verde: 90% o más</div></div></div>
-    <div class="panel"><div class="table-toolbar"><div><h3>Detalle semanal por territorio y turno</h3><div id="tableCaption" class="summary-note">La tabla sigue la estructura de “Territorio Safety”.</div></div><div class="table-actions"><button id="toggleAllShifts" type="button">Mostrar todos los turnos</button><input id="tableSearch" type="search" placeholder="Buscar área o territorio"></div></div><div class="table-wrap"><div id="weeklyTable"><div class="empty-summary">Cargando datos publicados…</div></div></div></div>
+    <div class="panel"><div class="table-toolbar"><div><h3>Detalle semanal por territorio y turno</h3><div id="tableCaption" class="summary-note">La tabla sigue la estructura de “Territorio Safety”.</div></div><div class="table-actions"><label for="tableWeek">Semana</label><select id="tableWeek" aria-label="Filtrar por semana"></select><button id="exportWeeklyTable" type="button">Exportar a Excel</button><button id="toggleAllShifts" type="button">Mostrar todos los turnos</button><input id="tableSearch" type="search" placeholder="Buscar área o territorio"></div></div><div class="table-wrap"><div id="weeklyTable"><div class="empty-summary">Cargando datos publicados…</div></div></div></div>
   </section>
 <script>
 (() => {
@@ -262,7 +381,7 @@
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
   let dataLoadPromise=null,inventoryLoadPromise=null,renderTurnWindow=null;
   const $=id=>document.getElementById(id);
-  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], weeklyRows:[], collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
+  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], googleChecks:[], shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
   try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
   const hadOwnershipList=localStorage.getItem(OWNED_REPORTS_KEY)!==null;
   try { const own=JSON.parse(localStorage.getItem(OWNED_REPORTS_KEY)||'null');state.ownedReportIds=new Set(Array.isArray(own)?own:state.userReports.map(r=>r.id).filter(Boolean)); } catch { state.ownedReportIds=new Set(state.userReports.map(r=>r.id).filter(Boolean)); }
@@ -298,7 +417,7 @@
     const query=normalizeKey($('reportSearch').value),risk=$('riskFilter').value,status=$('statusFilter').value;
     const rows=state.userReports.filter(r=>(!risk||r.risk===risk)&&(!status||r.status===status)&&(!query||normalizeKey([r.type,r.area,r.description,r.owner,r.department,r.company,r.sap].join(' ')).includes(query))).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
     $('recordsCount').textContent=`${rows.length} de ${state.userReports.length} reportes`;
-    $('reportsList').innerHTML=rows.length?rows.map(r=>{const editable=state.ownedReportIds.has(r.id),questions=[...startQuestions,...duringQuestions],answerEntries=Object.entries(r.answers||{});const answerList=answerEntries.map(([key,value])=>{const match=key.match(/^(start|during)_(\d+)$/);if(!match)return '';const list=match[1]==='start'?startQuestions:duringQuestions,label=list[Number(match[2])-1];return label?`<li><span>${esc(label)}</span><strong>${esc(value||'Sin respuesta')}</strong></li>`:'';}).join('');return `<article class="report-item"><div><div class="report-title">${esc(r.owner||'Sin nombre')} · ${esc(r.area||'Sin territorio')} <span class="risk-chip ${r.risk==='OK'?'low':''}">${esc(r.risk||'')}</span></div><div class="report-meta">SAP ${esc(r.sap||'—')} · ${esc(r.department||r.company||'')} · ${esc(r.date||'')}${r.shift?' · '+esc(r.shift):''} · ${esc(r.status||'')}</div><p class="report-description">${esc(r.description||'')}</p>${answerList?`<details class="report-answers"><summary>Ver respuestas del check (${questions.length})</summary><ol>${answerList}</ol></details>`:''}</div>${editable?`<div class="report-actions"><button type="button" class="secondary" data-edit-report="${esc(r.id)}">Editar</button></div>`:''}</article>`;}).join(''):'<div class="empty-reports">No hay checks que coincidan con la búsqueda.</div>';
+    $('reportsList').innerHTML=rows.length?rows.map(r=>{const editable=state.ownedReportIds.has(r.id),questions=[...startQuestions,...duringQuestions],answerEntries=Object.entries(r.answers||{});const answerList=answerEntries.map(([key,value])=>{const match=key.match(/^(start|during)_(\d+)$/);if(!match)return '';const list=match[1]==='start'?startQuestions:duringQuestions,label=list[Number(match[2])-1];return label?`<li><span>${esc(label)}</span><strong>${esc(value||'Sin respuesta')}</strong></li>`:'';}).join('');const participationLabel=r.validForParticipation===false?' · Guardado, sin participación':' · Contabilizado';return `<article class="report-item"><div><div class="report-title">${esc(r.owner||'Sin nombre')} · ${esc(r.area||'Sin territorio')} <span class="risk-chip ${r.risk==='OK'?'low':''}">${esc(r.risk||'')}</span></div><div class="report-meta">SAP ${esc(r.sap||'—')} · ${esc(r.department||r.company||'')} · ${esc(r.date||'')}${r.shift?' · '+esc(r.shift):''} · ${esc(r.status||'')}${participationLabel}</div><p class="report-description">${esc(r.description||'')}</p>${answerList?`<details class="report-answers"><summary>Ver respuestas del check (${questions.length})</summary><ol>${answerList}</ol></details>`:''}</div>${editable?`<div class="report-actions"><button type="button" class="secondary" data-edit-report="${esc(r.id)}">Editar</button></div>`:''}</article>`;}).join(''):'<div class="empty-reports">No hay checks que coincidan con la búsqueda.</div>';
     renderHome();
   }
   const companies=['GEGSA','FORROS TERMICOS','EXSAN','MMEEPI','SONORA','CARBETOS','TOCALO','LMX','NALCO','REDIPSA','ECOLAB','CHEAMTREAT','SERVICIOS ESPECIALIZADOS','FAMDEA'];
@@ -407,7 +526,7 @@
   document.querySelectorAll('input[name="actionNeeded"]').forEach(el=>el.addEventListener('change',()=>{
     setActionDetailsVisibility(document.querySelector('input[name="actionNeeded"]:checked')?.value==='Sí');
   }));
-  function resetReportForm(){ $('reportForm').reset();$('reportId').value='';$('reportDate').value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);$('formHeading').textContent='Monitoreo del dueño de territorio';$('saveReport').textContent='Enviar check';$('cancelEdit').hidden=true;setActionDetailsVisibility(false);updateEntityFields(); }
+  function resetReportForm(){ $('reportForm').reset();$('reportId').value='';const now=mexicoNow();$('reportDate').value=dateKey(now.year,now.month,now.day);$('reportShift').value=turnNames[now.hour>=22||now.hour<6?0:now.hour<14?1:2];$('formHeading').textContent='Monitoreo del dueño de territorio';$('saveReport').textContent='Enviar check';$('cancelEdit').hidden=true;setActionDetailsVisibility(false);updateEntityFields(); }
   function editReport(id){
     const r=state.userReports.find(x=>x.id===id);if(!r)return;resetReportForm();showView('register');$('reportId').value=r.id;$('sapNumber').value=r.sap||'';$('ownerName').value=r.owner||'';$('reportDate').value=r.date||'';$('reportShift').value=r.shift||'';
     const entity=r.entityType||'PLANTA',radio=document.querySelector(`input[name="entityType"][value="${CSS.escape(entity)}"]`);if(radio)radio.checked=true;updateEntityFields();
@@ -455,7 +574,7 @@
       try{
         if(!GOOGLE_SCRIPT_URL.startsWith('https://script.google.com/macros/s/'))throw new Error('Conexión pendiente: falta pegar la URL /exec del Apps Script.');
         let payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=read`);if(!payload||payload.ok!==true)throw new Error(payload?.error||'Google Sheets no devolvió datos.');
-        if(Array.isArray(payload.reports)&&Array.isArray(payload.locations)){
+        if(Array.isArray(payload.reports)&&Array.isArray(payload.locations)&&Array.isArray(payload.shiftExemptions)){
           const remoteReportIds=new Set(payload.reports.map(r=>String(r.id||'')));
           const remoteLocations=payload.locations;
           if(!state.sharedMigrationDone){
@@ -469,11 +588,12 @@
           }
           state.userReports=Array.isArray(payload.reports)?payload.reports:[];
           state.pins=Array.isArray(payload.locations)?payload.locations:[];
+          state.shiftExemptions=new Set(payload.shiftExemptions.filter(item=>item?.notApplicable).map(item=>shiftExemptionKey(item.department,item.territory,Number(item.weekday),Number(item.shift))));
           if(state.sharedMigrationDone)localStorage.setItem(KEY,JSON.stringify(state.pins));
           persistReports();
           renderReports();renderHome();renderTerritoryList();
-        }else throw new Error('El Apps Script publicado aún no incluye la consulta compartida. Vuelve a desplegar la versión nueva de Code.gs.');
-        const records=(payload.records||[]).map(r=>{const parts=dateParts(r.date);return parts&&r.territory?{year:parts[0],month:parts[1],day:parts[2],shift:norm(r.shift),territory:norm(r.territory)}:null;}).filter(Boolean);
+        }else throw new Error('El Apps Script publicado debe actualizarse para incluir las excepciones NA. Vuelve a desplegar la versión nueva de Code.gs.');
+        const records=(payload.records||[]).map(r=>{const parts=dateParts(r.date);return parts&&r.territory?{year:parts[0],month:parts[1],day:parts[2],shift:norm(r.shift),territory:norm(r.territory),department:norm(r.department)}:null;}).filter(Boolean);
         state.records=records;state.googleChecks=payload.statuses||[];state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas en Google Sheets`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
@@ -498,6 +618,8 @@
   }
   function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function locationMatches(a,b){return normalizeKey(a?.department)===normalizeKey(b?.department)&&normalizeKey(a?.territory)===normalizeKey(b?.territory);}
+  function shiftExemptionKey(department,territory,weekday,shift){return `${normalizeKey(department)}|${normalizeKey(territory)}|${weekday}|${shift}`;}
+  function isShiftNotApplicable(department,territory,weekday,shift){return state.shiftExemptions.has(shiftExemptionKey(department,territory,weekday,shift));}
   function populateLocationDepartments(){
     const select=$('locationDepartment'),departments=uniqueDepartments(state.inventoryRows);
     setOptions(select,departments,state.inventoryLoaded?'Selecciona un departamento':'Cargando departamentos…');
@@ -557,28 +679,29 @@
     if(!checks.length)return 'risk';
     return normalizeKey(checks[0].imminentRisk??checks[0].pregunta15??checks[0].q15)==='no'?'safe':'alert';
   }
-  function appendDangerBadge(group){
-    const badge=document.createElementNS('http://www.w3.org/2000/svg','circle');badge.setAttribute('cx','15');badge.setAttribute('cy','-14');badge.setAttribute('r','8');badge.setAttribute('fill','#d92d20');badge.setAttribute('stroke','white');badge.setAttribute('stroke-width','2');
-    const mark=document.createElementNS('http://www.w3.org/2000/svg','text');mark.setAttribute('x','15');mark.setAttribute('y','-10');mark.style.fill='white';mark.style.stroke='none';mark.style.fontSize='12px';mark.style.fontWeight='800';mark.style.textAnchor='middle';mark.textContent='!';
+  function appendDangerBadge(group,unit){
+    const badge=document.createElementNS('http://www.w3.org/2000/svg','circle');badge.setAttribute('cx',String(11*unit));badge.setAttribute('cy',String(-11*unit));badge.setAttribute('r',String(7*unit));badge.setAttribute('fill','#d92d20');badge.setAttribute('stroke','white');badge.style.strokeWidth=String(2*unit)+'px';
+    const mark=document.createElementNS('http://www.w3.org/2000/svg','text');mark.setAttribute('x',String(11*unit));mark.setAttribute('y',String(-7.5*unit));mark.style.fill='white';mark.style.stroke='none';mark.style.fontSize=String(10*unit)+'px';mark.style.fontWeight='800';mark.style.textAnchor='middle';mark.textContent='!';
     group.append(badge,mark);
   }
   function render(){
     renderTurnWindow=currentTurnWindow();
+    const unit=2048/Math.max(280,$('mapWrap').clientWidth||280);
     const svg=$('overlay'); svg.innerHTML='';
     for(const p of state.pins){
       if(state.locationDraft?.mode==='move'&&p.id===state.locationDraft.pinId)continue;
       const status=pinRiskStatus(p.department,p.territory), color=status==='safe'?colors.done:colors.missing;
       const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','pin'+(p.id===state.selected?' selected':'')); g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`); g.dataset.id=p.id;
-      const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('r','13'); c.setAttribute('fill',color); c.style.color=color; c.setAttribute('class','blink');
-      const t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('y','-19'); t.textContent=p.territory; g.setAttribute('aria-label',`${p.department} · ${p.territory} · ${status==='safe'?'sin riesgo reportado en el turno actual':status==='alert'?'peligro reportado en el turno actual':'sin check en el turno actual'}`);
-      g.append(c,t);if(status==='alert')appendDangerBadge(g);g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;}); svg.append(g);
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('r',String(7*unit)); c.setAttribute('fill',color); c.style.color=color;c.style.strokeWidth=String((p.id===state.selected?4:3)*unit)+'px'; c.setAttribute('class','blink');
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('y',String(-13*unit));t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px'; t.textContent=p.territory; g.setAttribute('aria-label',`${p.department} · ${p.territory} · ${status==='safe'?'sin riesgo reportado en el turno actual':status==='alert'?'peligro reportado en el turno actual':'sin check en el turno actual'}`);
+      g.append(c,t);if(status==='alert')appendDangerBadge(g,unit);g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;}); svg.append(g);
     }
     if(state.locationDraft?.x!==undefined&&state.locationDraft?.x!==null){
       const p=state.locationDraft,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','pin selected');g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`);
       const draftStatus=p.mode==='move'?pinRiskStatus(p.department,p.territory):'draft';
-      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r','13');c.setAttribute('fill',draftStatus==='safe'?colors.done:draftStatus==='draft'?colors.unmapped:colors.missing);c.setAttribute('class','blink');
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',String(7*unit));c.setAttribute('fill',draftStatus==='safe'?colors.done:draftStatus==='draft'?colors.unmapped:colors.missing);c.style.strokeWidth=String(4*unit)+'px';c.setAttribute('class','blink');
       if(p.mode==='move'){g.dataset.draftPin='true';g.style.cursor='grab';g.style.touchAction='none';}
-      const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y','-19');t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);if(draftStatus==='alert')appendDangerBadge(g);svg.append(g);
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y',String(-13*unit));t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);if(draftStatus==='alert')appendDangerBadge(g,unit);svg.append(g);
     }
     $('mapWrap').style.cursor=state.locationDraft?.mode==='move'?'grab':state.placementMode?'crosshair':'default';
     $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 15 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
@@ -672,7 +795,8 @@
   function mexicoNow(){
     const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Mexico_City',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',hourCycle:'h23'}).formatToParts(new Date());
     const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
-    const year=+p.year, month=+p.month, day=+p.day, hour=+p.hour;
+    let year=+p.year, month=+p.month, day=+p.day; const hour=+p.hour;
+    if(hour>=22){const next=new Date(Date.UTC(year,month-1,day+1));year=next.getUTCFullYear();month=next.getUTCMonth()+1;day=next.getUTCDate();}
     const utcDate=new Date(Date.UTC(year,month-1,day));
     return {year,month,day,hour,dayIndex:(utcDate.getUTCDay()+6)%7,utcDate};
   }
@@ -700,21 +824,22 @@
     html+='</tr></thead><tbody>';
     const areas=sortAreas(new Set(visible.map(r=>r.area)),weeklyAreaOrder);
     for(const area of areas){
-      const group=visible.filter(r=>r.area===area), weeklyAvg=group.reduce((s,r)=>s+r.weeklyRate,0)/(group.length||1), d1Avg=group.reduce((s,r)=>s+r.d1Rate,0)/(group.length||1);
+      const group=visible.filter(r=>r.area===area),weeklyCount=group.reduce((s,r)=>s+r.weekCompleted,0),weeklyExpected=group.reduce((s,r)=>s+r.weekExpected,0),d1Count=group.reduce((s,r)=>s+r.d1Completed,0),d1Expected=group.reduce((s,r)=>s+r.d1Expected,0),weeklyAvg=weeklyExpected?weeklyCount/weeklyExpected:null,d1Avg=d1Expected?d1Count/d1Expected:null;
       const dayColumns=7+(7-state.collapsedDays.size)*3;
-      html+=`<tr class="area-row"><td colspan="3">${esc(displayArea(area))} · ${group.length} territorios</td><td>${Math.round(weeklyAvg*100)}%</td><td>${Math.round(d1Avg*100)}%</td><td colspan="${dayColumns}"></td></tr>`;
+      html+=`<tr class="area-row"><td colspan="3">${esc(displayArea(area))} · ${group.length} territorios</td><td>${weeklyAvg===null?'NA':Math.round(weeklyAvg*100)+'%'}</td><td>${d1Avg===null?'NA':Math.round(d1Avg*100)+'%'}</td><td colspan="${dayColumns}"></td></tr>`;
       for(const r of group){
-        const weeklyPct=Math.round(r.weeklyRate*100), d1Pct=Math.round(r.d1Rate*100);
-        html+=`<tr><td class="namecol left">${esc(r.area)}</td><td class="namecol c2 left">${esc(r.department)}</td><td class="namecol c3 left">${esc(r.territory)}</td><td class="rate ${weeklyPct===100?'good':'bad'}">${weeklyPct}%</td><td class="rate ${d1Pct===100?'good':'bad'}">${d1Pct}%</td>`;
+        const weeklyPct=Number.isFinite(r.weeklyRate)?Math.round(r.weeklyRate*100):null,d1Pct=Number.isFinite(r.d1Rate)?Math.round(r.d1Rate*100):null;
+        html+=`<tr><td class="namecol left">${esc(r.area)}</td><td class="namecol c2 left">${esc(r.department)}</td><td class="namecol c3 left">${esc(r.territory)}</td><td class="rate ${weeklyPct===null?'na-cell':weeklyPct===100?'good':'bad'}">${weeklyPct===null?'NA':weeklyPct+'%'}</td><td class="rate ${d1Pct===null?'na-cell':d1Pct===100?'good':'bad'}">${d1Pct===null?'NA':d1Pct+'%'}</td>`;
         for(let d=0;d<7;d++){
           if(!state.collapsedDays.has(d)){
             for(let turn=1;turn<=3;turn++){
               const val=r.cells[d][turn-1];
-              html+=val===null?'<td class="future">—</td>':`<td class="${val?'good':'bad'}">${val?'1':'0'}</td>`;
+              const na=val==='NA',future=val===null,cellClass=na?'na-cell':future?'future':val?'good':'bad',label=na?'NA':future?'—':String(val),status=na?'No esperado':future?'Turno futuro':val?'Check válido':'Sin check válido';
+              html+=`<td class="${cellClass}"><button type="button" class="shift-slot ${na?'na':future?'future':val?'good':'bad'}" data-shift-exemption="1" data-department="${esc(r.department)}" data-territory="${esc(r.territory)}" data-weekday="${d}" data-shift="${turn}" aria-label="${esc(r.territory)}, ${weekdays[d]}, ${turnNames[turn-1]}: ${status}. Cambiar expectativa">${label}</button></td>`;
             }
           }
           const avg=r.dailyRates[d];
-          html+=avg===null?'<td class="future">—</td>':`<td class="rate ${avg===1?'good':'bad'}">${Math.round(avg*100)}%</td>`;
+          html+=avg===null?`<td class="rate ${r.dailyExpected[d]===0&&d<=state.summaryDayIndex?'na-cell':'future'}">${r.dailyExpected[d]===0&&d<=state.summaryDayIndex?'NA':'—'}</td>`:`<td class="rate ${avg===1?'good':'bad'}">${Math.round(avg*100)}%</td>`;
         }
         html+='</tr>';
       }
@@ -724,38 +849,47 @@
   }
   function updateSummary(){
     if(!state.loaded)return;
-    const now=mexicoNow(), currentShift=now.hour>=22||now.hour<6?1:(now.hour<14?2:3), monday=new Date(now.utcDate.getTime()-now.dayIndex*86400000), mondayISO=isoWeek(monday.getUTCFullYear(),monday.getUTCMonth()+1,monday.getUTCDate());
-    const shiftWord=turnNames[currentShift-1], dateLabel=`${weekdays[now.dayIndex]} ${String(now.day).padStart(2,'0')}/${String(now.month).padStart(2,'0')}/${now.year}`;
-    $('summaryContext').textContent=`Semana ${mondayISO.week} de ${mondayISO.year} · corte al ${dateLabel}, ${shiftWord} (${turnHours[currentShift-1]}).`;
-    $('weeklyChartCaption').textContent=`Checks registrados ÷ turnos transcurridos, desde el lunes hasta ${dayNames[now.dayIndex]}, ${shiftWord} (${turnHours[currentShift-1]}), agrupado por área.`;
-    const previousDate=new Date(now.utcDate.getTime()-86400000), d1Key=dateKey(previousDate.getUTCFullYear(),previousDate.getUTCMonth()+1,previousDate.getUTCDate());
-    $('d1ChartCaption').textContent=`${String(previousDate.getUTCDate()).padStart(2,'0')}/${String(previousDate.getUTCMonth()+1).padStart(2,'0')}/${previousDate.getUTCFullYear()} · los tres turnos del día anterior.`;
-    $('tableCaption').textContent='D-1 = promedio de los 3 turnos del día anterior. % semanal = promedio de los cumplimientos diarios desde el lunes hasta el turno vigente. En el detalle por turno, 1 = check registrado y 0 = sin check; los turnos futuros quedan vacíos.';
+    const now=mexicoNow(), currentShift=now.hour>=22||now.hour<6?1:(now.hour<14?2:3), currentMonday=new Date(now.utcDate.getTime()-now.dayIndex*86400000), currentISO=isoWeek(now.year,now.month,now.day);
+    const weekSelect=$('tableWeek');
+    if(state.selectedWeekYear!==currentISO.year){state.selectedWeekYear=currentISO.year;state.selectedWeek=currentISO.week;}
+    weekSelect.innerHTML=Array.from({length:currentISO.week},(_,i)=>`<option value="${i+1}">Semana ${i+1}</option>`).join('');
+    if(state.selectedWeek<1||state.selectedWeek>currentISO.week)state.selectedWeek=currentISO.week;
+    weekSelect.value=String(state.selectedWeek);
+    const selectedWeek=state.selectedWeek, isCurrentWeek=selectedWeek===currentISO.week, monday=new Date(currentMonday.getTime()-(currentISO.week-selectedWeek)*7*86400000), cutoffDay=isCurrentWeek?now.dayIndex:6,cutoffShift=isCurrentWeek?currentShift:3,cutoffDate=new Date(monday.getTime()+cutoffDay*86400000),cutoffISO=dateKey(cutoffDate.getUTCFullYear(),cutoffDate.getUTCMonth()+1,cutoffDate.getUTCDate()), cutoffLabel=`${weekdays[cutoffDay]} ${String(cutoffDate.getUTCDate()).padStart(2,'0')}/${String(cutoffDate.getUTCMonth()+1).padStart(2,'0')}/${cutoffDate.getUTCFullYear()}`;
+    state.summaryDayIndex=cutoffDay;state.currentShift=cutoffShift;
+    const shiftWord=turnNames[cutoffShift-1];
+    $('summaryContext').textContent=`Semana ${selectedWeek} de ${currentISO.year} · corte al ${cutoffLabel}${isCurrentWeek?', '+shiftWord+' ('+turnHours[cutoffShift-1]+')':' · semana cerrada'}.`;
+    $('weeklyChartCaption').textContent=`Checks válidos ÷ turnos esperados de la semana ${selectedWeek}, hasta ${dayNames[cutoffDay]}${isCurrentWeek?' · '+shiftWord+' ('+turnHours[cutoffShift-1]+')':''}, agrupado por área.`;
+    const previousDate=new Date(cutoffDate.getTime()-86400000), d1Key=dateKey(previousDate.getUTCFullYear(),previousDate.getUTCMonth()+1,previousDate.getUTCDate());
+    $('d1ChartCaption').textContent=`${String(previousDate.getUTCDate()).padStart(2,'0')}/${String(previousDate.getUTCMonth()+1).padStart(2,'0')}/${previousDate.getUTCFullYear()} · turnos esperados del día anterior; NA se excluye.`;
+    $('tableCaption').textContent='El porcentaje semanal suma checks válidos ÷ turnos vencidos desde el lunes hasta el turno vigente. En cada celda de turno, pulsa para alternar entre el cálculo normal y NA (no esperado para ese territorio en ese día y turno); NA se guarda para todas las semanas.';
     const checks=new Set();
     for(const r of state.records){
       const turn=shiftNumber(r.shift); if(!turn)continue;
-      checks.add(`${norm(r.territory)}|${dateKey(r.year,r.month,r.day)}|${turn}`);
+      checks.add(`${normalizeKey(r.department)}|${normalizeKey(r.territory)}|${dateKey(r.year,r.month,r.day)}|${turn}`);
     }
-    const maxTodayShift=currentShift;
     state.weeklyRows=state.territoryRows.map(meta=>{
       const area=meta.line||meta.department||'Sin área', department=meta.department||'';
       const cells=Array.from({length:7},()=>[null,null,null]);
-      const dailyRates=Array(7).fill(null); let weeklySum=0, daysCount=0, allComplete=true, d1Completed=0;
-      for(let t=1;t<=3;t++)if(checks.has(`${norm(meta.territory)}|${d1Key}|${t}`))d1Completed++;
-      for(let d=0;d<=now.dayIndex;d++){
+      const dailyRates=Array(7).fill(null), dailyExpected=Array(7).fill(0); let weekCompleted=0,weekExpected=0,allComplete=true,d1Completed=0,d1Expected=0;
+      for(let d=0;d<7;d++)for(let t=1;t<=3;t++)if(isShiftNotApplicable(department,meta.territory,d,t))cells[d][t-1]='NA';
+      for(let t=1;t<=3;t++)if(!isShiftNotApplicable(department,meta.territory,(cutoffDay+6)%7,t)){d1Expected++;if(checks.has(`${normalizeKey(department)}|${normalizeKey(meta.territory)}|${d1Key}|${t}`))d1Completed++;}
+    for(let d=0;d<=cutoffDay;d++){
         const date=new Date(monday.getTime()+d*86400000), key=dateKey(date.getUTCFullYear(),date.getUTCMonth()+1,date.getUTCDate());
-        const shiftsDue=d<now.dayIndex?3:maxTodayShift; let completed=0;
+        const shiftsDue=d<cutoffDay?3:cutoffShift; let completed=0,expected=0;
         for(let t=1;t<=3;t++){
+          const na=isShiftNotApplicable(department,meta.territory,d,t);
+          if(na){cells[d][t-1]='NA';continue;}
           if(t>shiftsDue)continue;
-          const has=checks.has(`${meta.territory}|${key}|${t}`); cells[d][t-1]=has?1:0;
-          if(has)completed++;else allComplete=false;
+          const has=checks.has(`${normalizeKey(department)}|${normalizeKey(meta.territory)}|${key}|${t}`); cells[d][t-1]=has?1:0;
+          expected++;if(has)completed++;else allComplete=false;
         }
-        dailyRates[d]=completed/shiftsDue; weeklySum+=dailyRates[d]; daysCount++;
+        dailyExpected[d]=expected;dailyRates[d]=expected?completed/expected:null;weekCompleted+=completed;weekExpected+=expected;
       }
-      const weeklyRate=daysCount?weeklySum/daysCount:0;
-      return {...meta,area,department,cells,dailyRates,weeklyRate,allComplete,d1Rate:d1Completed/3};
+      const weeklyRate=weekExpected?weekCompleted/weekExpected:null,d1Rate=d1Expected?d1Completed/d1Expected:null,expectedSlots=weekExpected;
+      return {...meta,area,department,cells,dailyRates,dailyExpected,weeklyRate,weekCompleted,weekExpected,allComplete:expectedSlots>0&&allComplete,d1Rate,d1Completed,d1Expected,expectedSlots};
     });
-    const total=state.weeklyRows.length, compliant=state.weeklyRows.filter(r=>r.allComplete).length;
+    const total=state.weeklyRows.filter(r=>r.expectedSlots>0).length, compliant=state.weeklyRows.filter(r=>r.allComplete).length;
     $('totalTerritories').textContent=total.toLocaleString('es-MX');
     $('compliantTerritories').textContent=compliant.toLocaleString('es-MX');
     $('pendingTerritories').textContent=(total-compliant).toLocaleString('es-MX');
@@ -764,9 +898,9 @@
     renderWeeklyTable();
   }
   function aggregateAreas(rows,key){
-    const groups=new Map();
-    for(const row of rows){if(!groups.has(row.area))groups.set(row.area,[]);groups.get(row.area).push(row[key]);}
-    return [...groups].map(([area,values])=>({area,value:values.reduce((a,b)=>a+b,0)/(values.length||1)}));
+    const numerator=key==='weeklyRate'?'weekCompleted':'d1Completed',denominator=key==='weeklyRate'?'weekExpected':'d1Expected',groups=new Map();
+    for(const row of rows){if(!row[denominator])continue;if(!groups.has(row.area))groups.set(row.area,{completed:0,expected:0});const group=groups.get(row.area);group.completed+=row[numerator];group.expected+=row[denominator];}
+    return [...groups].map(([area,values])=>({area,value:values.completed/values.expected}));
   }
   function renderAreaChart(id,items,reference){
     const container=$(id);
@@ -786,11 +920,34 @@
     svg+='</svg>';container.innerHTML=svg;
   }
   $('tableSearch').addEventListener('input',renderWeeklyTable);
+  $('tableWeek').addEventListener('change',()=>{state.selectedWeek=Number($('tableWeek').value)||state.selectedWeek;updateSummary();});
+  $('exportWeeklyTable').addEventListener('click',()=>{
+    const source=$('weeklyTable').querySelector('table');
+    if(!source){$('tableCaption').textContent='No hay una tabla disponible para exportar.';return;}
+    if(!window.XLSX){$('tableCaption').textContent='No se pudo cargar el exportador de Excel. Recarga la página e inténtalo de nuevo.';return;}
+    const clone=source.cloneNode(true);
+    clone.querySelectorAll('.day-toggle').forEach(button=>button.remove());
+    clone.querySelectorAll('.shift-slot').forEach(button=>{const value=document.createElement('span');value.textContent=button.textContent.trim();button.replaceWith(value);});
+    const sheetName=`Semana ${state.selectedWeek}`,workbook=XLSX.utils.table_to_book(clone,{sheet:sheetName}),sheet=workbook.Sheets[sheetName];
+    if(sheet&&sheet['!ref'])sheet['!autofilter']={ref:sheet['!ref']};
+    XLSX.writeFile(workbook,`cumplimiento-semana-${state.selectedWeekYear}-S${String(state.selectedWeek).padStart(2,'0')}.xlsx`);
+  });
   $('toggleAllShifts').addEventListener('click',()=>{
     if(state.collapsedDays.size===7)state.collapsedDays.clear();else state.collapsedDays=new Set([0,1,2,3,4,5,6]);
     renderWeeklyTable();
   });
-  $('weeklyTable').addEventListener('click',ev=>{
+  $('weeklyTable').addEventListener('click',async ev=>{
+    const slot=ev.target.closest('[data-shift-exemption]');
+    if(slot){
+      const department=slot.dataset.department,territory=slot.dataset.territory,weekday=Number(slot.dataset.weekday),shift=Number(slot.dataset.shift),key=shiftExemptionKey(department,territory,weekday,shift),notApplicable=!state.shiftExemptions.has(key),label=slot.textContent;
+      slot.disabled=true;slot.textContent='…';
+      try{
+        await postShared({action:'setShiftExemption',exemption:{department,territory,weekday,shift,notApplicable}});
+        const confirmed=await refreshSharedData(()=>state.shiftExemptions.has(key)===notApplicable);
+        if(!confirmed)throw new Error('Google Sheets no confirmó el cambio. Actualiza el despliegue de Apps Script y vuelve a intentarlo.');
+      }catch(err){if(slot.isConnected){slot.disabled=false;slot.textContent=label;}$('tableCaption').textContent=`No se pudo guardar el cambio NA: ${err.message}`;}
+      return;
+    }
     const button=ev.target.closest('[data-toggle-day]'); if(!button)return;
     const day=+button.dataset.toggleDay;
     if(state.collapsedDays.has(day))state.collapsedDays.delete(day);else state.collapsedDays.add(day);
@@ -818,6 +975,8 @@
     $('placementHint').textContent='Suelta el semáforo en el lugar correcto. Puedes seguir arrastrándolo o confirmar la ubicación.';
   });
   $('overlay').addEventListener('pointercancel',()=>{state.draggingPin=false;});
+  let resizeFrame=0;
+  window.addEventListener('resize',()=>{if(state.draggingPin)return;cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(render);},{passive:true});
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
   loadInventoryData().then(()=>loadPublicData());
