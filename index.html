@@ -47,14 +47,6 @@
     .map-controls .legend { margin-right:auto }
     .map-controls button { width:auto; min-height:34px; padding:6px 11px }
     .placement-hint { min-height:18px; padding:0 4px; color:var(--muted); font-size:12px }
-    .precision-controls { display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:8px 4px; border:1px solid var(--line); border-radius:8px; background:var(--surface-soft); }
-    .precision-controls[hidden] { display:none !important }
-    .precision-controls .nudge-pad { display:grid; grid-template-columns:repeat(3,36px); grid-template-rows:repeat(2,32px); gap:3px; }
-    .precision-controls button { width:auto; min-width:36px; min-height:32px; padding:3px 8px; }
-    .precision-controls .nudge-pad button:nth-child(1) { grid-column:2;grid-row:1 }
-    .precision-controls .nudge-pad button:nth-child(2) { grid-column:1;grid-row:2 }
-    .precision-controls .nudge-pad button:nth-child(3) { grid-column:2;grid-row:2 }
-    .precision-controls .nudge-pad button:nth-child(4) { grid-column:3;grid-row:2 }
     .territory-item:focus-visible,.map-controls button:focus-visible { outline:3px solid #80b7e1; outline-offset:2px }
     .location-form[hidden],.map-controls [hidden] { display:none !important }
     h2 { font-size:16px; margin:0 0 12px }
@@ -368,18 +360,7 @@
       <div class="placement-hint" id="placementHint" role="status"></div>
       <div class="map-wrap" id="mapWrap">
         <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
-        <svg id="overlay" viewBox="0 0 2048 1166" preserveAspectRatio="none" aria-label="Marcadores de ubicación"></svg>
-      </div>
-      <div id="precisionControls" class="precision-controls" hidden aria-label="Ajuste preciso del semáforo">
-        <strong>Ajuste preciso:</strong>
-        <div class="nudge-pad" aria-label="Mover marcador">
-          <button type="button" data-nudge="0,-1" aria-label="Mover hacia arriba">↑</button>
-          <button type="button" data-nudge="-1,0" aria-label="Mover hacia la izquierda">←</button>
-          <button type="button" data-nudge="0,1" aria-label="Mover hacia abajo">↓</button>
-          <button type="button" data-nudge="1,0" aria-label="Mover hacia la derecha">→</button>
-        </div>
-        <label for="nudgeStep">Paso</label><select id="nudgeStep" aria-label="Precisión del ajuste"><option value="0.0025">Fino</option><option value="0.0005" selected>Muy fino</option><option value="0.0001">Milimétrico</option></select>
-        <span class="question-hint">Usa las flechas para ajustar la posición antes de confirmar.</span>
+        <svg id="overlay" viewBox="0 0 2048 1166" aria-label="Marcadores de ubicación"></svg>
       </div>
       <div id="mapMessage" class="empty">Agrega una ubicación y asígnale un territorio. Los datos del panel se actualizan desde el archivo publicado.</div>
     </section>
@@ -395,13 +376,12 @@
   const KEY='territorios-seguros-ubicaciones-v1';
   const REPORTS_KEY='territorio-seguro-reportes-v1';
   const OWNED_REPORTS_KEY='territorio-seguro-reportes-propios-v1';
-  const INVENTORY_CACHE_KEY='territorio-seguro-inventario-v1';
   const INVENTORY_URL='https://docs.google.com/spreadsheets/d/1vr3wyGQm6tsfP0mmg_dz_n6n5tCWa7VAj2YN8YK-3ts/gviz/tq';
   // URL de la aplicación web de Apps Script desplegada para este proyecto.
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
   let dataLoadPromise=null,inventoryLoadPromise=null,renderTurnWindow=null;
   const $=id=>document.getElementById(id);
-  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], initialRange:null,weekRecordsCache:{},weekLoads:{},historicalReports:[],googleChecks:[],shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[],pendingLocationSaves:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
+  const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], initialRange:null,weekRecordsCache:{},weekLoads:{},historicalReports:[],googleChecks:[],shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
   try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
   const hadOwnershipList=localStorage.getItem(OWNED_REPORTS_KEY)!==null;
   try { const own=JSON.parse(localStorage.getItem(OWNED_REPORTS_KEY)||'null');state.ownedReportIds=new Set(Array.isArray(own)?own:state.userReports.map(r=>r.id).filter(Boolean)); } catch { state.ownedReportIds=new Set(state.userReports.map(r=>r.id).filter(Boolean)); }
@@ -487,7 +467,7 @@
   function requestInventorySheet(){
     return new Promise((resolve,reject)=>{
       const callback=`inventoryCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`,script=document.createElement('script');
-      const timer=setTimeout(()=>finish(new Error('La hoja INVENTARIO no respondió en 15 segundos. Revisa su acceso público y conexión.')),15000);
+      const timer=setTimeout(()=>finish(new Error('Tiempo de espera agotado al consultar la hoja INVENTARIO.')),20000);
       function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}
       window[callback]=value=>finish(null,value);
       script.onerror=()=>finish(new Error('No se pudo consultar la hoja INVENTARIO de Google Sheets.'));
@@ -499,26 +479,24 @@
     if(inventoryLoadPromise)return inventoryLoadPromise;
     inventoryLoadPromise=(async()=>{
       try{
-        if(!state.inventoryLoaded){
-          try{const cached=JSON.parse(localStorage.getItem(INVENTORY_CACHE_KEY)||'null'),cachedRows=Array.isArray(cached?.rows)?cached.rows:[];if(cachedRows.length){applyInventoryRows(cachedRows);$('territoryHint').textContent='Mostrando el inventario guardado mientras se actualiza desde Google Sheets…';}}catch(_){}
-        }
         const payload=await requestInventorySheet();
         if(payload?.status==='error')throw new Error(payload.errors?.[0]?.detailed_message||'Google Sheets devolvió un error al leer INVENTARIO.');
         const rawRows=(payload?.table?.rows||[]).map(row=>({department:norm(row.c?.[0]?.v??row.c?.[0]?.f),territory:norm(row.c?.[1]?.v??row.c?.[1]?.f)})).filter(row=>row.department&&row.territory);
         const seen=new Set(),rowsFound=rawRows.filter(row=>{const key=`${normalizeKey(row.department)}|${normalizeKey(row.territory)}`;if(seen.has(key))return false;seen.add(key);return true;});
         if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió pares de Departamento y Territorio en las columnas A y C.');
-        applyInventoryRows(rowsFound);localStorage.setItem(INVENTORY_CACHE_KEY,JSON.stringify({rows:rowsFound,updatedAt:Date.now()}));$('territoryHint').textContent='Departamentos y territorios actualizados desde Google Sheets · hoja INVENTARIO.';return true;
+        state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
+        state.legacyPins=state.legacyPins.map(p=>{
+          if(p.department)return p;
+          const departments=[...new Set(rowsFound.filter(r=>normalizeKey(r.territory)===normalizeKey(p.territory)).map(r=>r.department))];
+          return {...p,department:departments.length===1?departments[0]:''};
+        });
+        populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();$('territoryHint').textContent='Departamentos y territorios actualizados desde Google Sheets · hoja INVENTARIO.';$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();return true;
       }catch(err){
         if(!state.inventoryLoaded){state.inventoryRows=[];state.territories=[];state.territoryRows=[];populateDepartments();populateLocationDepartments();setOptions($('departmentSelect'),[],'No disponible: revisa la hoja INVENTARIO');$('departmentSelect').disabled=true;updateTerritoryOptions();$('count').textContent='Inventario no disponible';render();}
         $('territoryHint').textContent=`No se pudieron actualizar los datos de INVENTARIO en Google Sheets: ${err.message}`;renderTerritoryList();return false;
       }finally{inventoryLoadPromise=null;}
     })();
     return inventoryLoadPromise;
-  }
-  function applyInventoryRows(rowsFound){
-    state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
-    state.legacyPins=state.legacyPins.map(p=>{if(p.department)return p;const departments=[...new Set(rowsFound.filter(r=>normalizeKey(r.territory)===normalizeKey(p.territory)).map(r=>r.department))];return {...p,department:departments.length===1?departments[0]:''};});
-    populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();$('count').textContent=`${state.territories.length} territorios · participaciones desde Google Sheets`;render();updateSummary();
   }
   function updateTerritoryOptions(preserveSelection=true){
     const dept=$('departmentSelect').value, target=$('checkTerritory');
@@ -596,7 +574,7 @@
     m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return [+m[1],+m[2],+m[3]];
     return null;
   }
-  function jsonp(url){return new Promise((resolve,reject)=>{const callback='tsCallback_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script'),timer=setTimeout(()=>finish(new Error('Google Sheets no respondió en 15 segundos. Revisa la URL publicada y el acceso público del Apps Script.')),15000);function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}window[callback]=value=>finish(null,value);script.onerror=()=>finish(new Error('No se pudo consultar el servicio de Google Sheets.'));script.src=`${url}${url.includes('?')?'&':'?'}callback=${callback}&_=${Date.now()}`;document.head.appendChild(script);});}
+  function jsonp(url){return new Promise((resolve,reject)=>{const callback='tsCallback_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script'),timer=setTimeout(()=>finish(new Error('Tiempo de espera agotado al consultar Google Sheets.')),20000);function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}window[callback]=value=>finish(null,value);script.onerror=()=>finish(new Error('No se pudo consultar el servicio de Google Sheets.'));script.src=`${url}${url.includes('?')?'&':'?'}callback=${callback}&_=${Date.now()}`;document.head.appendChild(script);});}
   async function postShared(payload){const response=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});return response;}
   async function loadPublicData(){
     if(dataLoadPromise)return dataLoadPromise;
@@ -619,10 +597,7 @@
             state.sharedMigrationDone=reportsSynced&&locationsSynced;
           }
           state.userReports=Array.isArray(payload.reports)?payload.reports:[];
-          const syncedLocations=Array.isArray(payload.locations)?payload.locations:[];
-          state.pendingLocationSaves=state.pendingLocationSaves.filter(pending=>!syncedLocations.some(remote=>locationMatches(remote,pending)&&Math.abs(Number(remote.x)-Number(pending.x))<1e-6&&Math.abs(Number(remote.y)-Number(pending.y))<1e-6));
-          state.pins=[...syncedLocations];
-          for(const pending of state.pendingLocationSaves){const index=state.pins.findIndex(remote=>String(remote.id)===String(pending.id)||locationMatches(remote,pending));if(index<0)state.pins.push(pending);else state.pins[index]=pending;}
+          state.pins=Array.isArray(payload.locations)?payload.locations:[];
           state.shiftExemptions=new Set(payload.shiftExemptions.filter(item=>item?.notApplicable).map(item=>shiftExemptionKey(item.department,item.territory,Number(item.weekday),Number(item.shift))));
           if(state.sharedMigrationDone)localStorage.setItem(KEY,JSON.stringify(state.pins));
           persistReports();
@@ -632,7 +607,7 @@
         state.records=records;state.initialRange=payload.range||null;state.googleChecks=payload.statuses||[];state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas del periodo reciente`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
-        $('recordStatus').textContent=state.sharedMigrationDone?'Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 8 segundos.':'Conexión compartida activa. Sincronizando ubicaciones y registros guardados anteriormente en este navegador…';
+        $('recordStatus').textContent=state.sharedMigrationDone?'Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 15 segundos.':'Conexión compartida activa. Sincronizando ubicaciones y registros guardados anteriormente en este navegador…';
         render();renderTerritoryList();updateSummary();return true;
       }catch(err){
         $('bookStatus').textContent=`No se pudieron cargar los datos: ${err.message}`;
@@ -649,20 +624,6 @@
       if(loaded&&(!isConfirmed||isConfirmed()))return true;
       if(attempt<3)await new Promise(resolve=>setTimeout(resolve,750));
     }
-    return false;
-  }
-  async function verifySavedLocation(pin){
-    let lastError='La escritura no apareció en la consulta de ubicaciones.';
-    for(let attempt=0;attempt<4;attempt++){
-      if(attempt)await new Promise(resolve=>setTimeout(resolve,900));
-      try{
-        const payload=await jsonp(`${GOOGLE_SCRIPT_URL}?action=locations`);
-        if(!payload?.ok)throw new Error(payload?.error||lastError);
-        const saved=(payload.locations||[]).find(item=>locationMatches(item,pin)&&Math.abs(Number(item.x)-Number(pin.x))<1e-6&&Math.abs(Number(item.y)-Number(pin.y))<1e-6);
-        if(saved){state.pendingLocationSaves=state.pendingLocationSaves.filter(item=>String(item.id)!==String(pin.id));state.pins=payload.locations;localStorage.setItem(KEY,JSON.stringify(state.pins));render();renderTerritoryList();renderHome();return true;}
-      }catch(err){lastError=err.message||lastError;}
-    }
-    $('bookStatus').textContent=`La ubicación se envió, pero Google Sheets aún no la confirma: ${lastError}`;
     return false;
   }
   function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -753,18 +714,10 @@
       const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y',String(-13*unit));t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);if(draftStatus==='alert')appendDangerBadge(g,unit);svg.append(g);
     }
     $('mapWrap').style.cursor=state.locationDraft?.mode==='move'?'grab':state.placementMode?'crosshair':'default';
-    $('overlay').style.touchAction=state.placementMode?'none':'auto';
-    $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 8 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
-    const draftHasPoint=state.locationDraft?.x!==null&&state.locationDraft?.x!==undefined&&state.locationDraft?.y!==null&&state.locationDraft?.y!==undefined;
-    $('precisionControls').hidden=!draftHasPoint||!$('locationForm').hidden;
-  }
-  function mapPointFromEvent(ev){
-    const svg=$('overlay'),point=svg.createSVGPoint();point.x=ev.clientX;point.y=ev.clientY;
-    const local=point.matrixTransform(svg.getScreenCTM().inverse());
-    return {x:Math.max(0,Math.min(1,local.x/2048)),y:Math.max(0,Math.min(1,local.y/1166))};
+    $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 15 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
   }
   function resetLocationFlow(){
-    state.locationDraft=null;state.placementMode=false;state.draggingPin=false;$('precisionControls').hidden=true;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;$('deleteLocation').hidden=true;
+    state.locationDraft=null;state.placementMode=false;state.draggingPin=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;$('deleteLocation').hidden=true;
     $('deleteLocation').disabled=false;$('deleteLocation').textContent='Eliminar semáforo';
     $('locationDepartment').disabled=!state.inventoryLoaded;$('locationDepartment').value='';updateLocationTerritories();$('locationTerritory').value='';
     $('locateSemaphore').hidden=false;$('saveSemaphore').hidden=true;$('saveSemaphore').textContent='Guardar ubicación';$('confirmLocation').hidden=true;$('placementHint').textContent='';$('locationStatus').textContent='';render();
@@ -776,7 +729,7 @@
   function beginMoveFlow(pinId){
     const pin=state.pins.find(item=>item.id===pinId);if(!pin)return;
     resetLocationFlow();state.locationDraft={mode:'move',pinId:pin.id,department:pin.department,territory:pin.territory,x:Number(pin.x),y:Number(pin.y)};state.placementMode=true;
-    $('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=false;$('deleteLocation').hidden=false;$('confirmLocation').textContent='Confirmar ubicación';$('placementHint').textContent=`Arrastra el semáforo o usa las flechas de ajuste fino para ${pin.department} · ${pin.territory}.`;render();
+    $('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=false;$('deleteLocation').hidden=false;$('confirmLocation').textContent='Confirmar ubicación';$('placementHint').textContent=`Arrastra el semáforo de ${pin.department} · ${pin.territory} hasta la posición correcta y confirma.`;render();
   }
   $('addSemaphore').addEventListener('click',beginLocationFlow);
   $('locationDepartment').addEventListener('change',()=>{updateLocationTerritories();$('locationTerritory').value='';$('locateSemaphore').disabled=true;});
@@ -785,11 +738,11 @@
     const department=$('locationDepartment').value,territory=$('locationTerritory').value;
     if(!department||!territory)return;
     if(state.pins.some(p=>locationMatches(p,{department,territory}))){$('locationStatus').textContent='Ese territorio ya tiene un semáforo en el layout.';return;}
-    state.locationDraft={mode:'add',department,territory,x:null,y:null};state.placementMode=true;$('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=true;$('placementHint').textContent=`Toca o haz clic en el layout para una posición aproximada; después podrás ajustarla con precisión.`;$('locationStatus').textContent='';render();
+    state.locationDraft={department,territory,x:null,y:null};state.placementMode=true;$('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=true;$('placementHint').textContent=`Haz clic en el layout para ubicar ${department} · ${territory}.`;$('locationStatus').textContent='';render();
   });
   $('confirmLocation').addEventListener('click',()=>{
     if(!state.locationDraft||state.locationDraft.x===null||state.locationDraft.y===null)return;
-    state.placementMode=false;$('locationForm').hidden=false;$('precisionControls').hidden=true;
+    state.placementMode=false;$('locationForm').hidden=false;
     const moving=state.locationDraft.mode==='move';$('locationFormTitle').textContent=moving?'Modificar ubicación':'Confirmar semáforo';
     $('locationDepartment').value=state.locationDraft.department;$('locationTerritory').value=state.locationDraft.territory;
     $('locationDepartment').disabled=true;$('locationTerritory').disabled=true;$('locateSemaphore').hidden=true;$('saveSemaphore').hidden=false;$('saveSemaphore').textContent=moving?'Guardar nueva ubicación':'Guardar ubicación';$('confirmLocation').hidden=true;$('cancelPlacement').hidden=true;
@@ -804,11 +757,10 @@
     }else pin={id:crypto.randomUUID(),x:draft.x,y:draft.y,department:draft.department,territory:draft.territory,name:draft.territory};
     try{
       await postShared({action:'saveLocation',location:pin});
-      state.pendingLocationSaves=state.pendingLocationSaves.filter(item=>!locationMatches(item,pin));state.pendingLocationSaves.push(pin);
-      const localIndex=state.pins.findIndex(item=>String(item.id)===String(pin.id)||locationMatches(item,pin));if(localIndex<0)state.pins.push(pin);else state.pins[localIndex]=pin;
+      const matchesSavedPosition=()=>state.pins.some(item=>locationMatches(item,pin)&&Math.abs(Number(item.x)-Number(pin.x))<1e-6&&Math.abs(Number(item.y)-Number(pin.y))<1e-6);
+      const refreshed=await refreshSharedData(matchesSavedPosition);
+      if(!refreshed)throw new Error('La ubicación no apareció en la consulta compartida. Verifica que el despliegue activo de Code.gs incluya la acción saveLocation y tenga permiso para editar la hoja.');
       localStorage.setItem(KEY,JSON.stringify(state.pins));state.selected=null;renderTerritoryList();renderHome();resetLocationFlow();
-      $('recordStatus').textContent='Ubicación enviada a Google Sheets. La verificación se realiza en segundo plano; la actualización compartida es cada 8 segundos.';
-      void verifySavedLocation(pin);
     }catch(err){button.disabled=false;button.textContent=draft.mode==='move'?'Guardar nueva ubicación':'Guardar ubicación';$('locationStatus').textContent=`No se pudo guardar la ubicación compartida: ${err.message}`;render();}
   });
   $('cancelSemaphore').addEventListener('click',resetLocationFlow);
@@ -1022,16 +974,17 @@
   $('overlay').addEventListener('click',ev=>{
     if(!state.placementMode||!state.locationDraft)return;
     if(state.locationDraft.mode==='move')return;
-    ev.preventDefault();ev.stopImmediatePropagation();
-    const point=mapPointFromEvent(ev);state.locationDraft.x=point.x;state.locationDraft.y=point.y;state.placementMode=false;$('confirmLocation').hidden=false;$('cancelPlacement').hidden=false;$('placementHint').textContent='Ajusta la marca con las flechas si hace falta y luego pulsa “Confirmar ubicación”.';render();
-  },true);
+    const rect=$('mapWrap').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
+    state.locationDraft.x=Math.max(0,Math.min(1,x));state.locationDraft.y=Math.max(0,Math.min(1,y));state.placementMode=false;$('confirmLocation').hidden=false;$('cancelPlacement').hidden=false;$('placementHint').textContent='Revisa la marca azul; pulsa “Confirmar ubicación” para regresar al formulario.';render();
+  });
   $('overlay').addEventListener('pointerdown',ev=>{
     if(!state.placementMode||state.locationDraft?.mode!=='move'||!ev.target.closest('[data-draft-pin]'))return;
     ev.preventDefault();state.draggingPin=true;$('overlay').setPointerCapture(ev.pointerId);
   });
   $('overlay').addEventListener('pointermove',ev=>{
     if(!state.draggingPin||!state.locationDraft)return;
-    const point=mapPointFromEvent(ev);state.locationDraft.x=point.x;state.locationDraft.y=point.y;
+    const rect=$('mapWrap').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
+    state.locationDraft.x=Math.max(0,Math.min(1,x));state.locationDraft.y=Math.max(0,Math.min(1,y));
     const marker=$('overlay').querySelector('[data-draft-pin]');if(marker)marker.setAttribute('transform',`translate(${state.locationDraft.x*2048},${state.locationDraft.y*1166})`);
   });
   $('overlay').addEventListener('pointerup',ev=>{
@@ -1040,18 +993,12 @@
     $('placementHint').textContent='Suelta el semáforo en el lugar correcto. Puedes seguir arrastrándolo o confirmar la ubicación.';
   });
   $('overlay').addEventListener('pointercancel',()=>{state.draggingPin=false;});
-  $('precisionControls').addEventListener('click',ev=>{
-    const button=ev.target.closest('[data-nudge]');if(!button||!state.locationDraft)return;
-    const [dx,dy]=button.dataset.nudge.split(',').map(Number),step=Number($('nudgeStep').value)||0.0005;
-    state.locationDraft.x=Math.max(0,Math.min(1,state.locationDraft.x+dx*step));state.locationDraft.y=Math.max(0,Math.min(1,state.locationDraft.y+dy*step));render();
-  });
   let resizeFrame=0;
   window.addEventListener('resize',()=>{if(state.draggingPin)return;cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(render);},{passive:true});
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
-  loadInventoryData();
-  loadPublicData();
-  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},8000);
+  loadInventoryData().then(()=>loadPublicData());
+  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},15000);
   setInterval(()=>loadInventoryData(),300000);
 })();
 </script>
