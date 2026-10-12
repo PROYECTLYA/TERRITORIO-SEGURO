@@ -235,7 +235,7 @@
       </section>
     </aside>
     <section class="map-card">
-      <div class="map-top"><h2>Plano general</h2><div class="map-controls"><span class="legend"><span style="color:#d92d20">● Riesgo Sí / sin registro</span> &nbsp; <span style="color:#159447">● Riesgo No</span></span><button id="cancelPlacement" class="secondary" type="button" hidden>Cancelar ubicación</button><button id="confirmLocation" type="button" hidden>Confirmar ubicación</button><button id="sidebarToggle" class="secondary" type="button">Ocultar lista</button></div></div>
+      <div class="map-top"><h2>Plano general</h2><div class="map-controls"><span class="legend"><span style="color:#d92d20">● Riesgo Sí / sin registro</span> &nbsp; <span style="color:#159447">● Riesgo No</span></span><button id="deleteLocation" class="secondary" type="button" hidden>Eliminar semáforo</button><button id="cancelPlacement" class="secondary" type="button" hidden>Cancelar</button><button id="confirmLocation" type="button" hidden>Confirmar ubicación</button><button id="sidebarToggle" class="secondary" type="button">Ocultar lista</button></div></div>
       <div class="placement-hint" id="placementHint" role="status"></div>
       <div class="map-wrap" id="mapWrap">
         <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
@@ -534,6 +534,7 @@
   function render(){
     const svg=$('overlay'); svg.innerHTML='';
     for(const p of state.pins){
+      if(state.locationDraft?.mode==='move'&&p.id===state.locationDraft.pinId)continue;
       const status=pinRiskStatus(p.department,p.territory), color=status==='safe'?colors.done:colors.missing;
       const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','pin'+(p.id===state.selected?' selected':'')); g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`); g.dataset.id=p.id;
       const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('r','13'); c.setAttribute('fill',color); c.style.color=color; c.setAttribute('class','blink');
@@ -542,14 +543,15 @@
     }
     if(state.locationDraft?.x!==undefined&&state.locationDraft?.x!==null){
       const p=state.locationDraft,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','pin selected');g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`);
-      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r','13');c.setAttribute('fill',colors.unmapped);c.setAttribute('class','blink');
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r','13');c.setAttribute('fill',p.mode==='move'?(pinRiskStatus(p.department,p.territory)==='safe'?colors.done:colors.missing):colors.unmapped);c.setAttribute('class','blink');
+      if(p.mode==='move'){g.dataset.draftPin='true';g.style.cursor='grab';}
       const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y','-19');t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);svg.append(g);
     }
-    $('mapWrap').style.cursor=state.placementMode?'crosshair':'default';
+    $('mapWrap').style.cursor=state.locationDraft?.mode==='move'?'grab':state.placementMode?'crosshair':'default';
     $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) leídos de Google Sheets. Verde intermitente = la respuesta más reciente a la pregunta 15 fue No; rojo intermitente = Sí o sin registro.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
   }
   function resetLocationFlow(){
-    state.locationDraft=null;state.placementMode=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;
+    state.locationDraft=null;state.placementMode=false;state.draggingPin=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;$('deleteLocation').hidden=true;
     $('locationDepartment').disabled=!state.inventoryLoaded;$('locationDepartment').value='';updateLocationTerritories();$('locationTerritory').value='';
     $('locateSemaphore').hidden=false;$('saveSemaphore').hidden=true;$('saveSemaphore').textContent='Guardar ubicación';$('confirmLocation').hidden=true;$('placementHint').textContent='';$('locationStatus').textContent='';render();
   }
@@ -559,8 +561,8 @@
   }
   function beginMoveFlow(pinId){
     const pin=state.pins.find(item=>item.id===pinId);if(!pin)return;
-    resetLocationFlow();state.locationDraft={mode:'move',pinId:pin.id,department:pin.department,territory:pin.territory,x:null,y:null};state.placementMode=true;
-    $('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('placementHint').textContent=`Haz clic en el layout para reubicar ${pin.department} · ${pin.territory}.`;render();
+    resetLocationFlow();state.locationDraft={mode:'move',pinId:pin.id,department:pin.department,territory:pin.territory,x:Number(pin.x),y:Number(pin.y)};state.placementMode=true;
+    $('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=false;$('deleteLocation').hidden=false;$('confirmLocation').textContent='Confirmar ubicación';$('placementHint').textContent=`Arrastra el semáforo de ${pin.department} · ${pin.territory} hasta la posición correcta y confirma.`;render();
   }
   $('addSemaphore').addEventListener('click',beginLocationFlow);
   $('locationDepartment').addEventListener('change',()=>{updateLocationTerritories();$('locationTerritory').value='';$('locateSemaphore').disabled=true;});
@@ -572,7 +574,7 @@
     state.locationDraft={department,territory,x:null,y:null};state.placementMode=true;$('locationForm').hidden=true;$('cancelPlacement').hidden=false;$('confirmLocation').hidden=true;$('placementHint').textContent=`Haz clic en el layout para ubicar ${department} · ${territory}.`;$('locationStatus').textContent='';render();
   });
   $('confirmLocation').addEventListener('click',()=>{
-    if(!state.locationDraft||state.locationDraft.x===null)return;
+    if(!state.locationDraft||state.locationDraft.x===null||state.locationDraft.y===null)return;
     state.placementMode=false;$('locationForm').hidden=false;
     const moving=state.locationDraft.mode==='move';$('locationFormTitle').textContent=moving?'Modificar ubicación':'Confirmar semáforo';
     $('locationDepartment').value=state.locationDraft.department;$('locationTerritory').value=state.locationDraft.territory;
@@ -596,6 +598,17 @@
   });
   $('cancelSemaphore').addEventListener('click',resetLocationFlow);
   $('cancelPlacement').addEventListener('click',resetLocationFlow);
+  $('deleteLocation').addEventListener('click',async()=>{
+    const draft=state.locationDraft;if(!draft||draft.mode!=='move')return;
+    if(!window.confirm(`¿Eliminar el semáforo de ${draft.department} · ${draft.territory} del mapa compartido?`))return;
+    const button=$('deleteLocation');button.disabled=true;button.textContent='Eliminando…';
+    try{
+      await postShared({action:'deleteLocation',location:{id:draft.pinId,department:draft.department,territory:draft.territory}});
+      const removed=await refreshSharedData(()=>!state.pins.some(item=>item.id===draft.pinId||locationMatches(item,draft)));
+      if(!removed)throw new Error('El semáforo sigue apareciendo en Google Sheets. Verifica que hayas actualizado el despliegue de Apps Script.');
+      localStorage.setItem(KEY,JSON.stringify(state.pins));state.selected=null;renderTerritoryList();renderHome();resetLocationFlow();
+    }catch(err){button.disabled=false;button.textContent='Eliminar semáforo';$('placementHint').textContent=`No se pudo eliminar: ${err.message}`;}
+  });
   $('territoryList').addEventListener('click',ev=>{
     const move=ev.target.closest('[data-move-pin]');if(move){ev.stopPropagation();beginMoveFlow(move.dataset.movePin);return;}
     const item=ev.target.closest('[data-pin-id]');if(!item)return;state.selected=item.dataset.pinId;render();
@@ -751,9 +764,26 @@
   });
   $('overlay').addEventListener('click',ev=>{
     if(!state.placementMode||!state.locationDraft)return;
+    if(state.locationDraft.mode==='move')return;
     const rect=$('mapWrap').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
     state.locationDraft.x=Math.max(0,Math.min(1,x));state.locationDraft.y=Math.max(0,Math.min(1,y));state.placementMode=false;$('confirmLocation').hidden=false;$('cancelPlacement').hidden=false;$('placementHint').textContent='Revisa la marca azul; pulsa “Confirmar ubicación” para regresar al formulario.';render();
   });
+  $('overlay').addEventListener('pointerdown',ev=>{
+    if(!state.placementMode||state.locationDraft?.mode!=='move'||!ev.target.closest('[data-draft-pin]'))return;
+    ev.preventDefault();state.draggingPin=true;$('overlay').setPointerCapture(ev.pointerId);
+  });
+  $('overlay').addEventListener('pointermove',ev=>{
+    if(!state.draggingPin||!state.locationDraft)return;
+    const rect=$('mapWrap').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
+    state.locationDraft.x=Math.max(0,Math.min(1,x));state.locationDraft.y=Math.max(0,Math.min(1,y));
+    const marker=$('overlay').querySelector('[data-draft-pin]');if(marker)marker.setAttribute('transform',`translate(${state.locationDraft.x*2048},${state.locationDraft.y*1166})`);
+  });
+  $('overlay').addEventListener('pointerup',ev=>{
+    if(!state.draggingPin)return;state.draggingPin=false;
+    if($('overlay').hasPointerCapture(ev.pointerId))$('overlay').releasePointerCapture(ev.pointerId);
+    $('placementHint').textContent='Suelta el semáforo en el lugar correcto. Puedes seguir arrastrándolo o confirmar la ubicación.';
+  });
+  $('overlay').addEventListener('pointercancel',()=>{state.draggingPin=false;});
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
   loadInventoryData().then(()=>loadPublicData());
