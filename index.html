@@ -134,6 +134,12 @@
     .weekly-table .day-toggle { margin-left:7px; min-width:26px; min-height:24px; padding:1px 6px; line-height:1 }
     .table-toolbar input,.table-toolbar select { width:min(280px,100%); min-height:36px }
     .empty-summary { padding:34px 16px; text-align:center; color:var(--muted) }
+    .cache-consent { position:fixed; z-index:100; inset:auto 16px 16px; margin-left:auto; max-width:620px; padding:16px; background:var(--surface,#fff); color:var(--ink,#182230); border:1px solid var(--line,#d8e0e9); border-radius:12px; box-shadow:0 12px 40px #0003; }
+    .cache-consent[hidden] { display:none !important }
+    .cache-consent p { margin:0 0 10px }
+    .cache-consent-actions { display:flex; flex-wrap:wrap; gap:8px }
+    .cache-consent-actions button { width:auto; min-height:36px; padding:7px 12px }
+    .cache-consent-actions .secondary { background:var(--surface-soft,#f7f8fa); color:var(--ink,#182230); border-color:var(--line,#d8e0e9) }
     .views { flex-wrap:wrap }
     .views button { min-height:38px }
     .workspace-view { padding:20px; max-width:1500px; margin:0 auto }
@@ -303,6 +309,7 @@
   </style>
 </head>
 <body>
+  <div id="cacheConsent" class="cache-consent" role="dialog" aria-label="Preferencia de caché local" hidden><p><strong>Mejorar la carga de esta página</strong><br>¿Permites guardar una copia temporal de los datos de territorios y checks en este navegador? Esto puede acelerar futuras visitas. Tus filtros y búsquedas permanecen solo en este navegador.</p><div class="cache-consent-actions"><button id="acceptCache" type="button">Permitir caché local</button><button id="rejectCache" class="secondary" type="button">Continuar sin guardar</button></div></div>
   <header><h1>Territorio Seguro</h1><p>Reportes, ubicaciones y seguimiento de riesgos.</p><nav class="views" aria-label="Menú principal"><button id="homeTab" class="active" type="button">Inicio</button><button id="registerTab" type="button">Registrar</button><button id="recordsTab" type="button">Gestión de registros</button><button id="mapTab" type="button">Mapa de riesgo</button><button id="summaryTab" type="button">Análisis detallado</button></nav></header>
   <section id="homeView" class="workspace-view">
     <div class="workspace-head"><div><h2>Panel de Territorio Seguro</h2><div class="summary-note">Registra condiciones y eventos, consulta reportes y ubica los riesgos en el plano.</div></div></div>
@@ -376,6 +383,9 @@
   const KEY='territorios-seguros-ubicaciones-v1';
   const REPORTS_KEY='territorio-seguro-reportes-v1';
   const OWNED_REPORTS_KEY='territorio-seguro-reportes-propios-v1';
+  const FILTER_PREFS_KEY='territorio-seguro-filtros-locales-v1';
+  const CACHE_DB='territorio-seguro-cache-v1';
+  const CACHE_CONSENT='territorio-seguro-cache-consent';
   const INVENTORY_URL='https://docs.google.com/spreadsheets/d/1vr3wyGQm6tsfP0mmg_dz_n6n5tCWa7VAj2YN8YK-3ts/gviz/tq';
   // URL de la aplicación web de Apps Script desplegada para este proyecto.
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
@@ -484,7 +494,7 @@
         const rawRows=(payload?.table?.rows||[]).map(row=>({department:norm(row.c?.[0]?.v??row.c?.[0]?.f),territory:norm(row.c?.[1]?.v??row.c?.[1]?.f)})).filter(row=>row.department&&row.territory);
         const seen=new Set(),rowsFound=rawRows.filter(row=>{const key=`${normalizeKey(row.department)}|${normalizeKey(row.territory)}`;if(seen.has(key))return false;seen.add(key);return true;});
         if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió pares de Departamento y Territorio en las columnas A y C.');
-        state.inventoryRows=rowsFound;state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
+        state.inventoryRows=rowsFound;writeCache('inventory',rowsFound);state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
         state.legacyPins=state.legacyPins.map(p=>{
           if(p.department)return p;
           const departments=[...new Set(rowsFound.filter(r=>normalizeKey(r.territory)===normalizeKey(p.territory)).map(r=>r.department))];
@@ -542,7 +552,8 @@
     if(!state.inventoryLoaded||!department||!area||!territoryBelongsToDepartment){$('reportFormStatus').textContent='Selecciona un territorio válido para el departamento elegido antes de enviar el check. Tu información permanece en el formulario.';return;}
     [...startQuestions.map((_,i)=>`start_${i+1}`),...duringQuestions.map((_,i)=>`during_${i+1}`)].forEach(name=>{answers[name]=document.querySelector(`input[name="${name}"]:checked`)?.value||'';});
     const result=Object.values(answers).includes('NOK')?'NOK':'OK',actionNeeded=document.querySelector('input[name="actionNeeded"]:checked')?.value||'No',rawAction=actionNeeded==='Sí'?$('actionDetails').value.trim().replace(/^#TS\s*/i,''):'',actionDetails=rawAction?`#TS ${rawAction}`:'',imminentRisk=document.querySelector('input[name="imminentRisk"]:checked')?.value||'',description=`Resultado ${result} (${Object.values(answers).filter(x=>x==='NOK').length} NOK de ${Object.keys(answers).length}). Riesgo inminente: ${imminentRisk}.${actionDetails?' Acción: '+actionDetails:''}`;
-    const report={id:id||crypto.randomUUID(),type:'Monitoreo de territorio',sap:$('sapNumber').value,owner:$('ownerName').value.trim(),date:$('reportDate').value,shift:$('reportShift').value,entityType,department,company,area,risk:result,imminentRisk,status:actionNeeded==='Sí'?'En seguimiento':'Sin acción',description,answers,actionNeeded,actionDetails,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+    const recordedAt=old?.recordedAt||old?.createdAt||new Date().toISOString(),period=periodFromTimestamp(recordedAt);
+    const report={id:id||crypto.randomUUID(),type:'Monitoreo de territorio',sap:$('sapNumber').value,owner:$('ownerName').value.trim(),date:period.date,checkDate:old?.checkDate||$('reportDate').value,shift:turnNames[period.shift-1],declaredShift:old?.declaredShift||$('reportShift').value,recordedAt,submissionTimestamp:recordedAt,weekNumber:period.week,weekYear:period.weekYear,operationalDay:period.dayName,entityType,department,company,area,risk:result,imminentRisk,status:actionNeeded==='Sí'?'En seguimiento':'Sin acción',description,answers,actionNeeded,actionDetails,createdAt:old?.createdAt||recordedAt,updatedAt:new Date().toISOString()};
     $('reportId').value=report.id;
     if(!GOOGLE_SCRIPT_URL.startsWith('https://script.google.com/macros/s/')){$('reportFormStatus').textContent='Falta configurar la URL del Apps Script de Google Sheets. El check no se envió.';return;}
     const button=$('saveReport');button.disabled=true;$('reportFormStatus').textContent='Enviando respuesta a Google Sheets…';
@@ -574,8 +585,38 @@
     m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return [+m[1],+m[2],+m[3]];
     return null;
   }
+  function periodFromTimestamp(value){
+    const instant=value instanceof Date?value:new Date(value);
+    if(!Number.isFinite(instant.getTime()))return null;
+    const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/Mexico_City',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(instant).map(p=>[p.type,p.value]));
+    let year=Number(parts.year),month=Number(parts.month),day=Number(parts.day),hour=Number(parts.hour),shift=hour>=22||hour<6?1:hour<14?2:3;
+    if(hour<6){const previous=new Date(Date.UTC(year,month-1,day-1));year=previous.getUTCFullYear();month=previous.getUTCMonth()+1;day=previous.getUTCDate();}
+    const operationalDate=new Date(Date.UTC(year,month-1,day)),dayName=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][(operationalDate.getUTCDay()+6)%7];
+    const iso=isoWeek(year,month,day);
+    return {year,month,day,shift,dayName,date:dateKey(year,month,day),week:iso.week,weekYear:iso.year};
+  }
+  function normalizeCheckRecord(record){
+    const stamp=record.recordedAt||record.submissionTimestamp||record.submittedAt||record.timestamp||record.createdAt||record.startTimestamp||record.startTime||record.horaInicio||record['Hora de inicio'];
+    const period=stamp?periodFromTimestamp(stamp):null;
+    const datePartsValue=dateParts(record.date||record.checkDate||record.fecha);
+    const derived=period|| (datePartsValue?{year:datePartsValue[0],month:datePartsValue[1],day:datePartsValue[2],shift:shiftNumber(record.shift||record.turno),date:dateKey(...datePartsValue)}:null);
+    const territory=norm(record.territory||record.area||record.territorio),department=norm(record.department||record.departamento||record.depto);
+    if(!derived||!territory)return null;
+    return {year:derived.year,month:derived.month,day:derived.day,shift:period?turnNames[period.shift-1]:norm(record.shift||record.turno),territory,department,recordedAt:stamp||''};
+  }
   function jsonp(url){return new Promise((resolve,reject)=>{const callback='tsCallback_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script'),timer=setTimeout(()=>finish(new Error('Tiempo de espera agotado al consultar Google Sheets.')),20000);function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}window[callback]=value=>finish(null,value);script.onerror=()=>finish(new Error('No se pudo consultar el servicio de Google Sheets.'));script.src=`${url}${url.includes('?')?'&':'?'}callback=${callback}&_=${Date.now()}`;document.head.appendChild(script);});}
   async function postShared(payload){const response=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});return response;}
+  function getCacheConsent(){return document.cookie.split('; ').find(x=>x.startsWith(CACHE_CONSENT+'='))?.split('=')[1]||'';}
+  function setCacheConsent(value){document.cookie=`${CACHE_CONSENT}=${value}; max-age=31536000; path=/; SameSite=Lax; Secure`;}
+  function openLocalCache(){return new Promise((resolve,reject)=>{if(!('indexedDB' in window)){reject(new Error('El navegador no ofrece caché local.'));return;}const request=indexedDB.open(CACHE_DB,1);request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('snapshots'))request.result.createObjectStore('snapshots');};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+  async function writeCache(key,value){if(getCacheConsent()!=='yes')return;let db;try{db=await openLocalCache();await new Promise((resolve,reject)=>{const tx=db.transaction('snapshots','readwrite');tx.objectStore('snapshots').put({savedAt:Date.now(),value},key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}catch{}finally{db?.close();}}
+  async function readCache(key,maxAge=300000){if(getCacheConsent()!=='yes')return null;let db;try{db=await openLocalCache();return await new Promise((resolve,reject)=>{const tx=db.transaction('snapshots','readonly'),request=tx.objectStore('snapshots').get(key);request.onsuccess=()=>{const item=request.result;resolve(item&&Date.now()-item.savedAt<=maxAge?item.value:null);};request.onerror=()=>reject(request.error);});}catch{return null;}finally{db?.close();}}
+  function clearLocalCache(){if('indexedDB' in window){const request=indexedDB.deleteDatabase(CACHE_DB);request.onerror=()=>{};}}
+  function applyCachedInventory(rows){if(!Array.isArray(rows)||!rows.length)return false;state.inventoryRows=rows;state.territoryRows=rows.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rows.map(r=>r.territory))];state.inventoryLoaded=true;populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();render();return true;}
+  function applyCachedAnalytics(cache){if(!cache)return false;if(Array.isArray(cache.records))state.records=cache.records;if(Array.isArray(cache.checks))state.googleChecks=cache.checks;if(Array.isArray(cache.locations))state.pins=cache.locations;if(Array.isArray(cache.exemptions))state.shiftExemptions=new Set(cache.exemptions);state.loaded=Array.isArray(cache.records);if(state.loaded){state.initialRange=cache.range||null;state.shifts=[...new Set(state.records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));$('count').textContent=`${state.territories.length} territorios · datos temporales guardados en este navegador`;$('bookStatus').textContent='Mostrando datos guardados localmente mientras se actualiza la conexión…';render();renderTerritoryList();updateSummary();}return state.loaded;}
+  $('acceptCache').addEventListener('click',()=>{setCacheConsent('yes');$('cacheConsent').hidden=true;loadInventoryData();loadPublicData();});
+  $('rejectCache').addEventListener('click',()=>{setCacheConsent('no');clearLocalCache();$('cacheConsent').hidden=true;});
+  if(!getCacheConsent())$('cacheConsent').hidden=false;else $('cacheConsent').hidden=true;
   async function loadPublicData(){
     if(dataLoadPromise)return dataLoadPromise;
     dataLoadPromise=(async()=>{
@@ -603,8 +644,8 @@
           persistReports();
           renderReports();renderHome();renderTerritoryList();
         }else throw new Error('El Apps Script publicado debe actualizarse para incluir las excepciones NA. Vuelve a desplegar la versión nueva de Code.gs.');
-        const records=(payload.records||[]).map(r=>{const parts=dateParts(r.date);return parts&&r.territory?{year:parts[0],month:parts[1],day:parts[2],shift:norm(r.shift),territory:norm(r.territory),department:norm(r.department)}:null;}).filter(Boolean);
-        state.records=records;state.initialRange=payload.range||null;state.googleChecks=payload.statuses||[];state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
+        const records=(payload.records||[]).map(normalizeCheckRecord).filter(Boolean);
+        state.records=records;state.initialRange=payload.range||null;state.googleChecks=(payload.statuses||[]).map(r=>({territory:norm(r.territory||r.territorio),department:norm(r.department||r.departamento),shift:norm(r.shift||r.turno),timestamp:r.timestamp||r.recordedAt||'',imminentRisk:r.imminentRisk??r.pregunta15??r.q15??''}));writeCache('analytics',{records,range:state.initialRange,checks:state.googleChecks,locations:state.pins,exemptions:[...state.shiftExemptions]});state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas del periodo reciente`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
         $('recordStatus').textContent=state.sharedMigrationDone?'Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 15 segundos.':'Conexión compartida activa. Sincronizando ubicaciones y registros guardados anteriormente en este navegador…';
@@ -658,7 +699,7 @@
       return pin?`<div class="territory-row"><button type="button" class="territory-item located has-pin" data-pin-id="${esc(pin.id)}" aria-label="${esc(department)}: ${esc(territory)}, ubicado en el layout">${label}</button><button type="button" class="modify-pin-button" data-move-pin="${esc(pin.id)}">Modificar ubicación</button></div>`:`<div class="territory-item not-located" role="listitem">${label}</div>`;
     }).join('')||'<div class="empty">Este departamento no tiene territorios en el inventario.</div>';
   }
-  $('territoryDepartmentFilter').addEventListener('change',renderTerritoryList);
+  $('territoryDepartmentFilter').addEventListener('change',()=>{saveLocalPreferences();renderTerritoryList();});
   function currentTurnWindow(){
     const timeZone='America/Mexico_City';
     const partsFor=instant=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric',hourCycle:'h23'}).formatToParts(instant).map(part=>[part.type,part.value]));
@@ -875,7 +916,7 @@
     let analysisRecords=inInitialRange?state.records:state.weekRecordsCache[weekKey];
     if(!analysisRecords){
       $('tableCaption').textContent=`Consultando de forma independiente la semana ${selectedWeek}…`;
-      if(!state.weekLoads[weekKey])state.weekLoads[weekKey]=jsonp(`${GOOGLE_SCRIPT_URL}?action=week&from=${weekFrom}&to=${weekTo}`).then(payload=>{if(!payload?.ok)throw new Error(payload?.error||'Google Sheets no devolvió la semana solicitada.');state.weekRecordsCache[weekKey]=(payload.records||[]).map(r=>{const parts=dateParts(r.date);return parts&&r.territory?{year:parts[0],month:parts[1],day:parts[2],shift:norm(r.shift),territory:norm(r.territory),department:norm(r.department)}:null;}).filter(Boolean);}).catch(err=>{$('tableCaption').textContent=`No se pudo consultar la semana ${selectedWeek}: ${err.message}`;}).finally(()=>{delete state.weekLoads[weekKey];if(state.weekRecordsCache[weekKey]&&state.selectedWeek===selectedWeek&&state.selectedWeekYear===currentISO.year)updateSummary();});
+      if(!state.weekLoads[weekKey])state.weekLoads[weekKey]=jsonp(`${GOOGLE_SCRIPT_URL}?action=reports&from=${weekFrom}&to=${weekTo}`).then(payload=>{if(!payload?.ok)throw new Error(payload?.error||'Google Sheets no devolvió el historial solicitado.');const source=Array.isArray(payload.records)?payload.records:(Array.isArray(payload.reports)?payload.reports:[]);state.weekRecordsCache[weekKey]=source.map(normalizeCheckRecord).filter(Boolean).filter(r=>{const iso=isoWeek(r.year,r.month,r.day);return iso.year===currentISO.year&&iso.week===selectedWeek;});}).catch(err=>{$('tableCaption').textContent=`No se pudo consultar la semana ${selectedWeek}: ${err.message}`;}).finally(()=>{delete state.weekLoads[weekKey];if(state.weekRecordsCache[weekKey]&&state.selectedWeek===selectedWeek&&state.selectedWeekYear===currentISO.year)updateSummary();});
       return;
     }
     const previousDate=new Date(cutoffDate.getTime()-86400000), d1Key=dateKey(previousDate.getUTCFullYear(),previousDate.getUTCMonth()+1,previousDate.getUTCDate());
@@ -937,8 +978,21 @@
     });
     svg+='</svg>';container.innerHTML=svg;
   }
+  function readLocalPreferences(){try{return JSON.parse(localStorage.getItem(FILTER_PREFS_KEY)||'{}')||{};}catch{return {};}}
+  function saveLocalPreferences(){
+    const values={tableWeek:$('tableWeek').value,tableSearch:$('tableSearch').value,reportSearch:$('reportSearch').value,riskFilter:$('riskFilter').value,statusFilter:$('statusFilter').value,reportsFrom:$('reportsFrom').value,reportsTo:$('reportsTo').value,territoryDepartmentFilter:$('territoryDepartmentFilter').value};
+    try{localStorage.setItem(FILTER_PREFS_KEY,JSON.stringify(values));}catch{}
+  }
+  function restoreLocalPreferences(){
+    const values=readLocalPreferences();
+    for(const id of ['tableSearch','reportSearch','riskFilter','statusFilter','reportsFrom','reportsTo'])if(values[id]!==undefined)$(id).value=values[id];
+    if(values.tableWeek!==undefined){state.selectedWeek=Number(values.tableWeek)||state.selectedWeek;state.selectedWeekYear=isoWeek(mexicoNow().year,mexicoNow().month,mexicoNow().day).year;if([...$('tableWeek').options].some(o=>o.value===values.tableWeek))$('tableWeek').value=values.tableWeek;}
+    if(values.territoryDepartmentFilter!==undefined&&[...$('territoryDepartmentFilter').options].some(o=>o.value===values.territoryDepartmentFilter))$('territoryDepartmentFilter').value=values.territoryDepartmentFilter;
+  }
+  for(const id of ['tableSearch','reportSearch','riskFilter','statusFilter','reportsFrom','reportsTo','tableWeek','territoryDepartmentFilter'])$(id).addEventListener('change',saveLocalPreferences);
+  for(const id of ['tableSearch','reportSearch'])$(id).addEventListener('input',saveLocalPreferences);
   $('tableSearch').addEventListener('input',renderWeeklyTable);
-  $('tableWeek').addEventListener('change',()=>{state.selectedWeek=Number($('tableWeek').value)||state.selectedWeek;updateSummary();});
+  $('tableWeek').addEventListener('change',()=>{state.selectedWeek=Number($('tableWeek').value)||state.selectedWeek;saveLocalPreferences();updateSummary();});
   $('exportWeeklyTable').addEventListener('click',()=>{
     const source=$('weeklyTable').querySelector('table');
     if(!source){$('tableCaption').textContent='No hay una tabla disponible para exportar.';return;}
@@ -997,10 +1051,14 @@
   window.addEventListener('resize',()=>{if(state.draggingPin)return;cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(render);},{passive:true});
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
-  loadInventoryData().then(()=>loadPublicData());
-  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},15000);
+  (async()=>{
+    if(getCacheConsent()==='yes'){const inventory=await readCache('inventory',1800000);applyCachedInventory(inventory);const analytics=await readCache('analytics',300000);applyCachedAnalytics(analytics);restoreLocalPreferences();renderReports();renderTerritoryList();renderWeeklyTable();}
+    loadInventoryData().then(()=>{restoreLocalPreferences();loadPublicData();});
+  })();
+  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},60000);
   setInterval(()=>loadInventoryData(),300000);
 })();
 </script>
 </body>
 </html>
+
