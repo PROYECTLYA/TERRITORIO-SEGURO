@@ -462,9 +462,10 @@
   }
   buildMatrix('startMatrix','start',startQuestions);buildMatrix('duringMatrix','during',duringQuestions);
   function setOptions(select,values,prompt){select.innerHTML=`<option value="">${prompt}</option>`+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');}
-  const packmanSubareas=['L02','L03','L04','L05','L06','L07','L09','L10','L11','L12','L13','Mtto. Envasado','Periféricos'];
+  function packmanSubareas(){const unique=new Map();for(const row of state.inventoryRows.filter(r=>normalizeKey(r.department)==='packman')){const line=lineForInventoryRow(row);if(line&&!unique.has(normalizeKey(line)))unique.set(normalizeKey(line),line);}return [...unique.values()].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));}
   function lineForInventoryRow(row){
     const department=norm(row.department),territory=norm(row.territory);
+    if(norm(row.line))return norm(row.line);
     if(normalizeKey(department)!=='packman')return department;
     const numbered=territory.match(/^(\d{1,2})\s*/);
     if(numbered){const n=Number(numbered[1]);if(n>=2&&n<=13)return `L${String(n).padStart(2,'0')}`;}
@@ -472,7 +473,7 @@
     if(/tapanco/i.test(territory))return 'Tapanco';
     return 'Periferico';
   }
-  function packmanSubareaForTerritory(territory){const row=state.inventoryRows.find(r=>normalizeKey(r.territory)===normalizeKey(territory)&&normalizeKey(r.department)==='packman');if(!row)return '';const line=lineForInventoryRow(row);return line==='Mtto Envasado'?'Mtto. Envasado':line==='Periferico'?'Periféricos':line;}
+  function packmanSubareaForTerritory(territory){const row=state.inventoryRows.find(r=>normalizeKey(r.territory)===normalizeKey(territory)&&normalizeKey(r.department)==='packman');return row?lineForInventoryRow(row):'';}
   function activeTerritoryRows(){return state.inventoryRows;}
   function uniqueDepartments(rows){
     const unique=new Map();for(const row of rows){const department=norm(row.department),key=normalizeKey(department);if(department&&!unique.has(key))unique.set(key,department);}
@@ -493,7 +494,7 @@
       function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}
       window[callback]=value=>finish(null,value);
       script.onerror=()=>finish(new Error('No se pudo consultar la hoja INVENTARIO de Google Sheets.'));
-      const params=new URLSearchParams({sheet:'INVENTARIO',tq:'select A, C where A is not null and C is not null',headers:'1',tqx:`out:json;responseHandler:${callback}`});
+      const params=new URLSearchParams({sheet:'INVENTARIO',tq:'select A, B, C where A is not null and C is not null',headers:'1',tqx:`out:json;responseHandler:${callback}`});
       script.src=`${INVENTORY_URL}?${params.toString()}`;document.head.appendChild(script);
     });
   }
@@ -503,9 +504,9 @@
       try{
         const payload=await requestInventorySheet();
         if(payload?.status==='error')throw new Error(payload.errors?.[0]?.detailed_message||'Google Sheets devolvió un error al leer INVENTARIO.');
-        const rawRows=(payload?.table?.rows||[]).map(row=>({department:norm(row.c?.[0]?.v??row.c?.[0]?.f),territory:norm(row.c?.[1]?.v??row.c?.[1]?.f)})).filter(row=>row.department&&row.territory);
-        const seen=new Set(),rowsFound=rawRows.filter(row=>{const key=`${normalizeKey(row.department)}|${normalizeKey(row.territory)}`;if(seen.has(key))return false;seen.add(key);return true;});
-        if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió pares de Departamento y Territorio en las columnas A y C.');
+        const rawRows=(payload?.table?.rows||[]).map(row=>({department:norm(row.c?.[0]?.v??row.c?.[0]?.f),line:norm(row.c?.[1]?.v??row.c?.[1]?.f),territory:norm(row.c?.[2]?.v??row.c?.[2]?.f)})).filter(row=>row.department&&row.territory);
+        const seen=new Set(),rowsFound=rawRows.filter(row=>{const key=`${normalizeKey(row.department)}|${normalizeKey(row.line)}|${normalizeKey(row.territory)}`;if(seen.has(key))return false;seen.add(key);return true;});
+        if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió Departamento, Línea y Territorio en las columnas A, B y C.');
         state.inventoryRows=rowsFound;writeCache('inventory',rowsFound);state.territoryRows=rowsFound.map(r=>({line:lineForInventoryRow(r),department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
         state.legacyPins=state.legacyPins.map(p=>{
           if(p.department)return p;
@@ -522,17 +523,17 @@
   }
   function updateTerritoryOptions(preserveSelection=true){
     const dept=$('departmentSelect').value, target=$('checkTerritory');
-    const previous=preserveSelection?target.value:'';
+    const previous=preserveSelection?target.value:'',previousSubarea=$('packmanSubarea').value;
     const isPackman=document.querySelector('input[name="entityType"]:checked')?.value==='PLANTA'&&normalizeKey(dept)==='packman';
     $('packmanSubareaBlock').hidden=!isPackman;$('packmanSubarea').required=isPackman;
-    if(isPackman){const subarea=$('packmanSubarea');setOptions(subarea,packmanSubareas,'Selecciona una subárea');if(previous){const matched=packmanSubareaForTerritory(previous);if(matched)subarea.value=matched;}}
+    if(isPackman){const subarea=$('packmanSubarea'),options=packmanSubareas();setOptions(subarea,options,'Selecciona una subárea');if(options.some(x=>normalizeKey(x)===normalizeKey(previousSubarea)))subarea.value=options.find(x=>normalizeKey(x)===normalizeKey(previousSubarea));}
     else $('packmanSubarea').value='';
     const selectedSubarea=isPackman?$('packmanSubarea').value:'';
-    const list=[...new Set(activeTerritoryRows().filter(r=>normalizeKey(r.department)===normalizeKey(dept)&&(!isPackman||!!selectedSubarea&&normalizeKey(packmanSubareaForTerritory(r.territory))===normalizeKey(selectedSubarea))).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
+    const list=[...new Set(activeTerritoryRows().filter(r=>normalizeKey(r.department)===normalizeKey(dept)&&(!isPackman||!!selectedSubarea&&normalizeKey(lineForInventoryRow(r))===normalizeKey(selectedSubarea))).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
     $('territoryLabel').textContent=isPackman?'8. Selecciona el territorio de la subárea':'7. Selecciona tu territorio';
     target.disabled=!state.inventoryLoaded||!dept||(isPackman&&!selectedSubarea);target.required=!!dept;setOptions(target,list,list.length?'Selecciona tu territorio':(isPackman&&!selectedSubarea?'Primero selecciona una subárea':state.inventoryLoaded?'No hay territorios para este departamento':'Cargando territorios…'));
     if(previous){const match=list.find(value=>normalizeKey(value)===normalizeKey(previous));if(match)target.value=match;}
-    if(dept&&!list.length&&state.inventoryLoaded)$('territoryHint').textContent=`No hay territorios asociados a ${dept} en la hoja INVENTARIO de Google Sheets.`;
+    if(dept&&!list.length&&state.inventoryLoaded&&(!isPackman||selectedSubarea))$('territoryHint').textContent=`No hay territorios asociados a ${dept}${isPackman?` · ${selectedSubarea}`:''} en la hoja INVENTARIO de Google Sheets.`;
   }
   function updateEntityFields(){
     const entity=document.querySelector('input[name="entityType"]:checked')?.value||'';
@@ -545,7 +546,7 @@
     if(hasEntity)updateTerritoryOptions();
   }
   document.querySelectorAll('input[name="entityType"]').forEach(el=>el.addEventListener('change',updateEntityFields));
-  $('departmentSelect').addEventListener('change',()=>updateTerritoryOptions(false));
+  $('departmentSelect').addEventListener('change',()=>{$('packmanSubarea').value='';updateTerritoryOptions(false);});
   $('packmanSubarea').addEventListener('change',()=>updateTerritoryOptions(false));
   $('sapNumber').addEventListener('input',ev=>{ev.currentTarget.value=ev.currentTarget.value.replace(/\D/g,'');});
   function setActionDetailsVisibility(visible){
