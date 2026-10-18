@@ -328,7 +328,8 @@
         <div class="field-block"><span class="field-title">5. Selecciona si perteneces a <span class="required-mark">*</span></span><div class="choice-row"><label><input type="radio" name="entityType" value="PLANTA" required> PLANTA</label><label><input type="radio" name="entityType" value="COMPAÑÍA" required> COMPAÑÍA</label></div></div>
         <div class="field-grid"><div class="field-block" id="departmentBlock" hidden><label class="field-title" for="departmentSelect">6. Departamento al que perteneces <span class="required-mark">*</span></label><select id="departmentSelect"><option value="">Selecciona un departamento</option></select></div>
         <div class="field-block" id="companyBlock" hidden><label class="field-title" for="companySelect">6. Compañía a la que perteneces <span class="required-mark">*</span></label><select id="companySelect"><option value="">Selecciona una compañía</option></select></div>
-        <div class="field-block" id="territorySelectBlock" hidden><label class="field-title" for="checkTerritory">7. Selecciona tu territorio <span class="required-mark">*</span></label><select id="checkTerritory"><option value="">Primero selecciona el departamento</option></select><span id="territoryHint" class="question-hint" role="status"></span></div></div>
+        <div class="field-block" id="packmanSubareaBlock" hidden><label class="field-title" for="packmanSubarea">7. Subárea de Packman <span class="required-mark">*</span></label><select id="packmanSubarea"><option value="">Selecciona una subárea</option></select></div>
+        <div class="field-block" id="territorySelectBlock" hidden><label class="field-title" for="checkTerritory"><span id="territoryLabel">7. Selecciona tu territorio</span> <span class="required-mark">*</span></label><select id="checkTerritory"><option value="">Primero selecciona el departamento</option></select><span id="territoryHint" class="question-hint" role="status"></span></div></div>
       </section>
       <section class="check-card"><h3>8. Atienda las siguientes preguntas mientras observas tu Territorio <span class="required-mark">*</span></h3><p>INICIO / TÉRMINO DE TURNO · Selecciona OK, NOK o NA para cada pregunta.</p><div id="startMatrix" class="matrix-scroll"></div></section>
       <section class="check-card"><h3>9. Atienda las siguientes preguntas mientras observa el trabajo, la tarea, el Territorio <span class="required-mark">*</span></h3><p>DURANTE EL TURNO · Selecciona OK, NOK o NA para cada pregunta.</p><div id="duringMatrix" class="matrix-scroll"></div></section>
@@ -461,6 +462,17 @@
   }
   buildMatrix('startMatrix','start',startQuestions);buildMatrix('duringMatrix','during',duringQuestions);
   function setOptions(select,values,prompt){select.innerHTML=`<option value="">${prompt}</option>`+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');}
+  const packmanSubareas=['L02','L03','L04','L05','L06','L07','L09','L10','L11','L12','L13','Mtto. Envasado','Periféricos'];
+  function lineForInventoryRow(row){
+    const department=norm(row.department),territory=norm(row.territory);
+    if(normalizeKey(department)!=='packman')return department;
+    const numbered=territory.match(/^(\d{1,2})\s*/);
+    if(numbered){const n=Number(numbered[1]);if(n>=2&&n<=13)return `L${String(n).padStart(2,'0')}`;}
+    if(/taller|toolkit|cuarto de copas/i.test(territory))return 'Mtto Envasado';
+    if(/tapanco/i.test(territory))return 'Tapanco';
+    return 'Periferico';
+  }
+  function packmanSubareaForTerritory(territory){const row=state.inventoryRows.find(r=>normalizeKey(r.territory)===normalizeKey(territory)&&normalizeKey(r.department)==='packman');if(!row)return '';const line=lineForInventoryRow(row);return line==='Mtto Envasado'?'Mtto. Envasado':line==='Periferico'?'Periféricos':line;}
   function activeTerritoryRows(){return state.inventoryRows;}
   function uniqueDepartments(rows){
     const unique=new Map();for(const row of rows){const department=norm(row.department),key=normalizeKey(department);if(department&&!unique.has(key))unique.set(key,department);}
@@ -494,7 +506,7 @@
         const rawRows=(payload?.table?.rows||[]).map(row=>({department:norm(row.c?.[0]?.v??row.c?.[0]?.f),territory:norm(row.c?.[1]?.v??row.c?.[1]?.f)})).filter(row=>row.department&&row.territory);
         const seen=new Set(),rowsFound=rawRows.filter(row=>{const key=`${normalizeKey(row.department)}|${normalizeKey(row.territory)}`;if(seen.has(key))return false;seen.add(key);return true;});
         if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió pares de Departamento y Territorio en las columnas A y C.');
-        state.inventoryRows=rowsFound;writeCache('inventory',rowsFound);state.territoryRows=rowsFound.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
+        state.inventoryRows=rowsFound;writeCache('inventory',rowsFound);state.territoryRows=rowsFound.map(r=>({line:lineForInventoryRow(r),department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
         state.legacyPins=state.legacyPins.map(p=>{
           if(p.department)return p;
           const departments=[...new Set(rowsFound.filter(r=>normalizeKey(r.territory)===normalizeKey(p.territory)).map(r=>r.department))];
@@ -511,8 +523,14 @@
   function updateTerritoryOptions(preserveSelection=true){
     const dept=$('departmentSelect').value, target=$('checkTerritory');
     const previous=preserveSelection?target.value:'';
-    const list=[...new Set(activeTerritoryRows().filter(r=>normalizeKey(r.department)===normalizeKey(dept)).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
-    target.disabled=!state.inventoryLoaded||!dept;target.required=!!dept;setOptions(target,list,list.length?'Selecciona tu territorio':(state.inventoryLoaded?'No hay territorios para este departamento':'Cargando territorios…'));
+    const isPackman=document.querySelector('input[name="entityType"]:checked')?.value==='PLANTA'&&normalizeKey(dept)==='packman';
+    $('packmanSubareaBlock').hidden=!isPackman;$('packmanSubarea').required=isPackman;
+    if(isPackman){const subarea=$('packmanSubarea');setOptions(subarea,packmanSubareas,'Selecciona una subárea');if(previous){const matched=packmanSubareaForTerritory(previous);if(matched)subarea.value=matched;}}
+    else $('packmanSubarea').value='';
+    const selectedSubarea=isPackman?$('packmanSubarea').value:'';
+    const list=[...new Set(activeTerritoryRows().filter(r=>normalizeKey(r.department)===normalizeKey(dept)&&(!isPackman||!!selectedSubarea&&normalizeKey(packmanSubareaForTerritory(r.territory))===normalizeKey(selectedSubarea))).map(r=>r.territory))].sort((a,b)=>a.localeCompare(b,'es'));
+    $('territoryLabel').textContent=isPackman?'8. Selecciona el territorio de la subárea':'7. Selecciona tu territorio';
+    target.disabled=!state.inventoryLoaded||!dept||(isPackman&&!selectedSubarea);target.required=!!dept;setOptions(target,list,list.length?'Selecciona tu territorio':(isPackman&&!selectedSubarea?'Primero selecciona una subárea':state.inventoryLoaded?'No hay territorios para este departamento':'Cargando territorios…'));
     if(previous){const match=list.find(value=>normalizeKey(value)===normalizeKey(previous));if(match)target.value=match;}
     if(dept&&!list.length&&state.inventoryLoaded)$('territoryHint').textContent=`No hay territorios asociados a ${dept} en la hoja INVENTARIO de Google Sheets.`;
   }
@@ -528,6 +546,7 @@
   }
   document.querySelectorAll('input[name="entityType"]').forEach(el=>el.addEventListener('change',updateEntityFields));
   $('departmentSelect').addEventListener('change',()=>updateTerritoryOptions(false));
+  $('packmanSubarea').addEventListener('change',()=>updateTerritoryOptions(false));
   $('sapNumber').addEventListener('input',ev=>{ev.currentTarget.value=ev.currentTarget.value.replace(/\D/g,'');});
   function setActionDetailsVisibility(visible){
     $('actionDetailsBlock').hidden=!visible;
@@ -541,7 +560,7 @@
   function editReport(id){
     const r=state.userReports.find(x=>x.id===id);if(!r)return;resetReportForm();showView('register');$('reportId').value=r.id;$('sapNumber').value=r.sap||'';$('ownerName').value=r.owner||'';$('reportDate').value=r.date||'';$('reportShift').value=r.shift||'';
     const entity=r.entityType||'PLANTA',radio=document.querySelector(`input[name="entityType"][value="${CSS.escape(entity)}"]`);if(radio)radio.checked=true;updateEntityFields();
-    $('departmentSelect').value=r.department||'';if(entity==='COMPAÑÍA')$('companySelect').value=r.company||'';updateTerritoryOptions();$('checkTerritory').value=r.area||'';
+    $('departmentSelect').value=r.department||'';if(entity==='COMPAÑÍA')$('companySelect').value=r.company||'';updateTerritoryOptions();if(entity==='PLANTA'&&normalizeKey(r.department)==='packman'){$('packmanSubarea').value=packmanSubareaForTerritory(r.area)||'';updateTerritoryOptions();}$('checkTerritory').value=r.area||'';
     for(const [name,value] of Object.entries(r.answers||{})){const input=document.querySelector(`input[name="${CSS.escape(name)}"][value="${CSS.escape(value)}"]`);if(input)input.checked=true;}
     const action=document.querySelector(`input[name="actionNeeded"][value="${CSS.escape(r.actionNeeded||'No')}"]`);if(action)action.checked=true;const yes=r.actionNeeded==='Sí';setActionDetailsVisibility(yes);$('actionDetails').value=yes?(r.actionDetails||''):'';$('formHeading').textContent='Editar monitoreo de territorio';$('saveReport').textContent='Guardar cambios';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'});
     const risk=document.querySelector(`input[name="imminentRisk"][value="${CSS.escape(r.imminentRisk||'')}"]`);if(risk)risk.checked=true;
@@ -612,7 +631,7 @@
   async function writeCache(key,value){if(getCacheConsent()!=='yes')return;let db;try{db=await openLocalCache();await new Promise((resolve,reject)=>{const tx=db.transaction('snapshots','readwrite');tx.objectStore('snapshots').put({savedAt:Date.now(),value},key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}catch{}finally{db?.close();}}
   async function readCache(key,maxAge=300000){if(getCacheConsent()!=='yes')return null;let db;try{db=await openLocalCache();return await new Promise((resolve,reject)=>{const tx=db.transaction('snapshots','readonly'),request=tx.objectStore('snapshots').get(key);request.onsuccess=()=>{const item=request.result;resolve(item&&Date.now()-item.savedAt<=maxAge?item.value:null);};request.onerror=()=>reject(request.error);});}catch{return null;}finally{db?.close();}}
   function clearLocalCache(){if('indexedDB' in window){const request=indexedDB.deleteDatabase(CACHE_DB);request.onerror=()=>{};}}
-  function applyCachedInventory(rows){if(!Array.isArray(rows)||!rows.length)return false;state.inventoryRows=rows;state.territoryRows=rows.map(r=>({line:r.department,department:r.department,territory:r.territory}));state.territories=[...new Set(rows.map(r=>r.territory))];state.inventoryLoaded=true;populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();render();return true;}
+  function applyCachedInventory(rows){if(!Array.isArray(rows)||!rows.length)return false;state.inventoryRows=rows;state.territoryRows=rows.map(r=>({line:lineForInventoryRow(r),department:r.department,territory:r.territory}));state.territories=[...new Set(rows.map(r=>r.territory))];state.inventoryLoaded=true;populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();render();return true;}
   function applyCachedAnalytics(cache){if(!cache)return false;if(Array.isArray(cache.records))state.records=cache.records;if(Array.isArray(cache.checks))state.googleChecks=cache.checks;if(Array.isArray(cache.locations))state.pins=cache.locations;if(Array.isArray(cache.exemptions))state.shiftExemptions=new Set(cache.exemptions);state.loaded=Array.isArray(cache.records);if(state.loaded){state.initialRange=cache.range||null;state.shifts=[...new Set(state.records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));$('count').textContent=`${state.territories.length} territorios · datos temporales guardados en este navegador`;$('bookStatus').textContent='Mostrando datos guardados localmente mientras se actualiza la conexión…';render();renderTerritoryList();updateSummary();}return state.loaded;}
   $('acceptCache').addEventListener('click',()=>{setCacheConsent('yes');$('cacheConsent').hidden=true;loadInventoryData();loadPublicData();});
   $('rejectCache').addEventListener('click',()=>{setCacheConsent('no');clearLocalCache();$('cacheConsent').hidden=true;});
