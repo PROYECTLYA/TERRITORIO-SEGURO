@@ -68,6 +68,17 @@
     .legend { color:var(--muted); font-size:12px }
     .map-wrap { position:relative; line-height:0; overflow:hidden; border-radius:7px; background:#eef1f4; cursor:crosshair }
     .map-wrap img { display:block; width:100%; height:auto; user-select:none; pointer-events:none }
+    body.map-fullscreen { overflow:hidden; background:#000; }
+    body.map-fullscreen > header { display:none !important; }
+    body.map-fullscreen #mapView { display:block; position:fixed; inset:0; z-index:1000; width:100vw; height:100vh; height:100dvh; min-height:0; margin:0; padding:0; overflow:hidden; background:#000; }
+    body.map-fullscreen #territorySidebar,body.map-fullscreen .map-top,body.map-fullscreen #placementHint,body.map-fullscreen #mapMessage { display:none !important; }
+    body.map-fullscreen .map-card { position:relative; width:100%; height:100%; min-width:0; padding:0; overflow:hidden; border:0; border-radius:0; background:#000; box-shadow:none; }
+    body.map-fullscreen .map-wrap { position:absolute; top:50%; left:50%; width:min(100vw, 175.6dvh); height:min(100dvh, 56.96vw); transform:translate(-50%,-50%); overflow:hidden; border-radius:0; background:#000; cursor:default; }
+    body.map-fullscreen .map-wrap img { width:100%; height:100%; object-fit:fill; }
+    body.map-fullscreen #overlay { pointer-events:none; }
+    #fullscreenExitButton { display:none; }
+    body.map-fullscreen #fullscreenExitButton { display:block; position:fixed; z-index:1002; top:max(12px,env(safe-area-inset-top)); right:max(12px,env(safe-area-inset-right)); width:auto; min-width:44px; min-height:44px; padding:8px 12px; border:1px solid #ffffff70; background:#10231fcc; color:#fff; opacity:.14; transition:opacity .18s ease; }
+    body.map-fullscreen #fullscreenExitButton:hover,body.map-fullscreen #fullscreenExitButton:focus-visible { opacity:1; }
     svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible }
     .pin { cursor:pointer }
     .pin circle { stroke:white; stroke-width:3; filter:drop-shadow(0 1px 2px #0008) }
@@ -364,7 +375,7 @@
       </section>
     </aside>
     <section class="map-card">
-      <div class="map-top"><h2>Plano general</h2><div class="map-controls"><span class="legend"><span style="color:#159447">● Verde: No</span> &nbsp; <span style="color:#d92d20">● Rojo + !: Sí</span> &nbsp; <span style="color:#d92d20">● Rojo: sin check del turno</span></span><button id="deleteLocation" class="secondary" type="button" hidden>Eliminar semáforo</button><button id="cancelPlacement" class="secondary" type="button" hidden>Cancelar</button><button id="confirmLocation" type="button" hidden>Confirmar ubicación</button><button id="sidebarToggle" class="secondary" type="button">Ocultar lista</button></div></div>
+      <div class="map-top"><h2>Plano general</h2><div class="map-controls"><span class="legend"><span style="color:#159447">● Verde: No</span> &nbsp; <span style="color:#d92d20">● Rojo + !: Sí</span> &nbsp; <span style="color:#d92d20">● Rojo: sin check del turno</span></span><button id="deleteLocation" class="secondary" type="button" hidden>Eliminar semáforo</button><button id="cancelPlacement" class="secondary" type="button" hidden>Cancelar</button><button id="confirmLocation" type="button" hidden>Confirmar ubicación</button><button id="sidebarToggle" class="secondary" type="button">Ver mapa completo</button></div></div>
       <div class="placement-hint" id="placementHint" role="status"></div>
       <div class="map-wrap" id="mapWrap">
         <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
@@ -372,6 +383,7 @@
       </div>
       <div id="mapMessage" class="empty">Agrega una ubicación y asígnale un territorio. Los datos del panel se actualizan desde el archivo publicado.</div>
     </section>
+    <button id="fullscreenExitButton" type="button" aria-label="Salir de la vista de mapa completo" title="Salir del mapa completo">Salir ✕</button>
   </main>
   <section id="summaryView" class="summary-view" hidden>
     <div class="summary-head"><div><h2>Análisis detallado de reportes</h2><div id="summaryContext" class="summary-note">Conectando con los datos publicados…</div></div><div class="summary-note">Turnos: 1.º 22:00–06:00 · 2.º 06:00–14:00 · 3.º 14:00–22:00</div></div>
@@ -397,16 +409,23 @@
   const hadOwnershipList=localStorage.getItem(OWNED_REPORTS_KEY)!==null;
   try { const own=JSON.parse(localStorage.getItem(OWNED_REPORTS_KEY)||'null');state.ownedReportIds=new Set(Array.isArray(own)?own:state.userReports.map(r=>r.id).filter(Boolean)); } catch { state.ownedReportIds=new Set(state.userReports.map(r=>r.id).filter(Boolean)); }
   state.legacyReports=hadOwnershipList?[]:[...state.userReports];
-  $('sidebarToggle').addEventListener('click',()=>{
-    const full=$('mapView').classList.toggle('full-view');
-    $('sidebarToggle').textContent=full?'Mostrar lista':'Ocultar lista';
-  });
+  function setMapFullscreen(enabled){
+    document.body.classList.toggle('map-fullscreen',enabled);
+    $('sidebarToggle').textContent=enabled?'Salir del mapa completo':'Ver mapa completo';
+    if(enabled){const request=document.documentElement.requestFullscreen?.();if(request?.catch)request.catch(()=>{});}
+    else if(document.fullscreenElement)document.exitFullscreen?.().catch?.(()=>{});
+  }
+  $('sidebarToggle').addEventListener('click',()=>setMapFullscreen(!document.body.classList.contains('map-fullscreen')));
+  $('fullscreenExitButton').addEventListener('click',()=>setMapFullscreen(false));
+  document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement){document.body.classList.remove('map-fullscreen');$('sidebarToggle').textContent='Ver mapa completo';}});
+  document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&document.body.classList.contains('map-fullscreen'))setMapFullscreen(false);});
   $('homeTab').addEventListener('click',()=>showView('home'));
   $('registerTab').addEventListener('click',()=>showView('register'));
   $('recordsTab').addEventListener('click',()=>showView('records'));
   $('mapTab').addEventListener('click',()=>showView('map'));
   $('summaryTab').addEventListener('click',()=>{showView('summary');updateSummary();});
   function showView(view){
+    if(view!=='map'&&document.body.classList.contains('map-fullscreen'))setMapFullscreen(false);
     $('homeView').hidden=view!=='home';
     $('registerView').hidden=view!=='register';
     $('recordsView').hidden=view!=='records';
