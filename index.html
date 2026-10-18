@@ -73,12 +73,17 @@
     body.map-fullscreen #mapView { display:block; position:fixed; inset:0; z-index:1000; width:100vw; height:100vh; height:100dvh; min-height:0; margin:0; padding:0; overflow:hidden; background:#000; }
     body.map-fullscreen #territorySidebar,body.map-fullscreen .map-top,body.map-fullscreen #placementHint,body.map-fullscreen #mapMessage { display:none !important; }
     body.map-fullscreen .map-card { position:relative; width:100%; height:100%; min-width:0; padding:0; overflow:hidden; border:0; border-radius:0; background:#000; box-shadow:none; }
-    body.map-fullscreen .map-wrap { position:absolute; top:50%; left:50%; width:min(100vw, 175.6dvh); height:min(100dvh, 56.96vw); transform:translate(-50%,-50%); overflow:hidden; border-radius:0; background:#000; cursor:default; }
+    body.map-fullscreen .map-wrap { position:absolute; top:50%; left:50%; width:min(100vw, 175.6dvh); height:min(100dvh, 56.96vw); transform:translate(calc(-50% + var(--map-pan-x,0px)),calc(-50% + var(--map-pan-y,0px))) scale(var(--map-zoom,1)); transform-origin:center center; overflow:hidden; border-radius:0; background:#000; cursor:default; touch-action:none; }
     body.map-fullscreen .map-wrap img { width:100%; height:100%; object-fit:fill; }
     body.map-fullscreen #overlay { pointer-events:none; }
     #fullscreenExitButton { display:none; }
     body.map-fullscreen #fullscreenExitButton { display:block; position:fixed; z-index:1002; top:max(12px,env(safe-area-inset-top)); right:max(12px,env(safe-area-inset-right)); width:auto; min-width:44px; min-height:44px; padding:8px 12px; border:1px solid #ffffff70; background:#10231fcc; color:#fff; opacity:.14; transition:opacity .18s ease; }
     body.map-fullscreen #fullscreenExitButton:hover,body.map-fullscreen #fullscreenExitButton:focus-visible { opacity:1; }
+    #mapZoomControls { display:none; }
+    body.map-fullscreen #mapZoomControls { display:flex; position:fixed; z-index:1002; left:50%; bottom:max(16px,env(safe-area-inset-bottom)); transform:translateX(-50%); align-items:center; gap:8px; padding:7px; border:1px solid #ffffff55; border-radius:10px; background:#10231fcc; color:white; box-shadow:0 3px 15px #0008; }
+    body.map-fullscreen #mapZoomControls button { width:44px; min-width:44px; min-height:44px; padding:4px; border:1px solid #ffffff55; background:#ffffff18; color:#fff; font-size:20px; }
+    body.map-fullscreen #mapZoomControls button:hover,body.map-fullscreen #mapZoomControls button:focus-visible { background:#ffffff35; }
+    #mapZoomValue { min-width:52px; text-align:center; font-size:13px; font-weight:700; }
     svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible }
     .pin { cursor:pointer }
     .pin circle { stroke:white; stroke-width:3; filter:drop-shadow(0 1px 2px #0008) }
@@ -415,6 +420,7 @@
       <div id="mapMessage" class="empty">Agrega una ubicación y asígnale un territorio. Los datos del panel se actualizan desde el archivo publicado.</div>
     </section>
     <button id="fullscreenExitButton" type="button" aria-label="Salir de la vista de mapa completo" title="Salir del mapa completo">Salir ✕</button>
+    <div id="mapZoomControls" role="group" aria-label="Controles de zoom del mapa"><button id="zoomOutButton" type="button" aria-label="Alejar mapa" title="Alejar">−</button><span id="mapZoomValue" aria-live="polite">100%</span><button id="zoomInButton" type="button" aria-label="Acercar mapa" title="Acercar">+</button><button id="zoomResetButton" type="button" aria-label="Restablecer zoom" title="Restablecer">⤢</button></div>
   </main>
   <section id="summaryView" class="summary-view" hidden>
     <div class="summary-head"><div><h2>Análisis detallado de reportes</h2><div id="summaryContext" class="summary-note">Conectando con los datos publicados…</div></div><div class="summary-note">Turnos: 1.º 22:00–06:00 · 2.º 06:00–14:00 · 3.º 14:00–22:00</div></div>
@@ -436,6 +442,7 @@
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
   let dataLoadPromise=null,inventoryLoadPromise=null,renderTurnWindow=null;
   let homeDetailMode='all';
+  let mapZoom=1,mapPanX=0,mapPanY=0,zoomPointers=new Map(),zoomDrag=null,pinchStart=null;
   const $=id=>document.getElementById(id);
   const NA_CHANGE_PASSWORD='SFT';
   const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], initialRange:null,weekRecordsCache:{},weekLoads:{},historicalReports:[],homePeriodReports:[],googleChecks:[],shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
@@ -446,9 +453,37 @@
   function setMapFullscreen(enabled){
     document.body.classList.toggle('map-fullscreen',enabled);
     $('sidebarToggle').textContent=enabled?'Salir del mapa completo':'Ver mapa completo';
+    setMapZoom(1,true);
     if(enabled){const request=document.documentElement.requestFullscreen?.();if(request?.catch)request.catch(()=>{});}
     else if(document.fullscreenElement)document.exitFullscreen?.().catch?.(()=>{});
   }
+  function setMapZoom(value,resetPan=false){
+    mapZoom=Math.max(1,Math.min(4,Math.round(value*4)/4));
+    if(resetPan||mapZoom===1){mapPanX=0;mapPanY=0;}
+    else clampMapPan();
+    $('mapWrap').style.setProperty('--map-zoom',mapZoom);
+    $('mapWrap').style.setProperty('--map-pan-x',`${mapPanX}px`);$('mapWrap').style.setProperty('--map-pan-y',`${mapPanY}px`);
+    $('mapZoomValue').textContent=`${Math.round(mapZoom*100)}%`;
+  }
+  function clampMapPan(){const wrap=$('mapWrap'),maxX=wrap.clientWidth*(mapZoom-1)/2,maxY=wrap.clientHeight*(mapZoom-1)/2;mapPanX=Math.max(-maxX,Math.min(maxX,mapPanX));mapPanY=Math.max(-maxY,Math.min(maxY,mapPanY));}
+  $('zoomInButton').addEventListener('click',()=>setMapZoom(mapZoom+.25));
+  $('zoomOutButton').addEventListener('click',()=>setMapZoom(mapZoom-.25));
+  $('zoomResetButton').addEventListener('click',()=>setMapZoom(1,true));
+  $('mapWrap').addEventListener('wheel',ev=>{if(!document.body.classList.contains('map-fullscreen'))return;ev.preventDefault();setMapZoom(mapZoom+(ev.deltaY<0?.25:-.25));},{passive:false});
+  function pointerDistance(points){const [a,b]=[...points.values()];return Math.hypot(a.x-b.x,a.y-b.y);}
+  $('mapWrap').addEventListener('pointerdown',ev=>{
+    if(!document.body.classList.contains('map-fullscreen'))return;
+    $('mapWrap').setPointerCapture(ev.pointerId);zoomPointers.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+    if(zoomPointers.size>=2){pinchStart={distance:pointerDistance(zoomPointers),zoom:mapZoom};zoomDrag=null;}
+    else if(mapZoom>1)zoomDrag={id:ev.pointerId,x:ev.clientX,y:ev.clientY,panX:mapPanX,panY:mapPanY};
+  });
+  $('mapWrap').addEventListener('pointermove',ev=>{
+    if(!zoomPointers.has(ev.pointerId))return;zoomPointers.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+    if(zoomPointers.size>=2&&pinchStart?.distance){setMapZoom(pinchStart.zoom*pointerDistance(zoomPointers)/pinchStart.distance);return;}
+    if(zoomDrag?.id===ev.pointerId&&mapZoom>1){mapPanX=zoomDrag.panX+ev.clientX-zoomDrag.x;mapPanY=zoomDrag.panY+ev.clientY-zoomDrag.y;clampMapPan();$('mapWrap').style.setProperty('--map-pan-x',`${mapPanX}px`);$('mapWrap').style.setProperty('--map-pan-y',`${mapPanY}px`);}
+  });
+  function finishZoomPointer(ev){zoomPointers.delete(ev.pointerId);if(zoomPointers.size<2)pinchStart=null;zoomDrag=null;if(zoomPointers.size===1&&mapZoom>1){const [id,point]=[...zoomPointers.entries()][0];zoomDrag={id,x:point.x,y:point.y,panX:mapPanX,panY:mapPanY};}}
+  $('mapWrap').addEventListener('pointerup',finishZoomPointer);$('mapWrap').addEventListener('pointercancel',finishZoomPointer);
   $('sidebarToggle').addEventListener('click',()=>setMapFullscreen(!document.body.classList.contains('map-fullscreen')));
   $('fullscreenExitButton').addEventListener('click',()=>setMapFullscreen(false));
   document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement){document.body.classList.remove('map-fullscreen');$('sidebarToggle').textContent='Ver mapa completo';}});
