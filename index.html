@@ -949,7 +949,7 @@
     $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 15 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
   }
   function resetLocationFlow(){
-    state.locationDraft=null;state.placementMode=false;state.draggingPin=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;$('deleteLocation').hidden=true;
+    state.locationDraft=null;state.placementMode=false;state.draggingPin=false;$('locationForm').hidden=true;$('locationFormTitle').textContent='Nuevo semáforo';$('cancelPlacement').hidden=true;$('deleteLocation').hidden=true;$('saveSemaphore').disabled=false;
     $('deleteLocation').disabled=false;$('deleteLocation').textContent='Eliminar semáforo';
     $('locationDepartment').disabled=!state.inventoryLoaded;$('locationDepartment').value='';updateLocationTerritories();$('locationTerritory').value='';
     $('locateSemaphore').hidden=false;$('saveSemaphore').hidden=true;$('saveSemaphore').textContent='Guardar ubicación';$('confirmLocation').hidden=true;$('placementHint').textContent='';$('locationStatus').textContent='';render();
@@ -990,9 +990,19 @@
     try{
       await postShared({action:'saveLocation',location:pin});
       const matchesSavedPosition=()=>state.pins.some(item=>locationMatches(item,pin)&&Math.abs(Number(item.x)-Number(pin.x))<1e-6&&Math.abs(Number(item.y)-Number(pin.y))<1e-6);
-      const refreshed=await refreshSharedData(matchesSavedPosition);
-      if(!refreshed)throw new Error('La ubicación no apareció en la consulta compartida. Verifica que el despliegue activo de Code.gs incluya la acción saveLocation y tenga permiso para editar la hoja.');
-      localStorage.setItem(KEY,JSON.stringify(state.pins));state.selected=null;renderTerritoryList();renderHome();resetLocationFlow();
+      const pinIndex=state.pins.findIndex(item=>item.id===pin.id||locationMatches(item,pin));if(pinIndex<0)state.pins.push(pin);else state.pins[pinIndex]={...state.pins[pinIndex],...pin};
+      localStorage.setItem(KEY,JSON.stringify(state.pins));state.selected=null;renderTerritoryList();renderHome();resetLocationFlow();$('recordStatus').textContent='Ubicación guardada. Confirmando la sincronización compartida…';
+      // La consulta de confirmación puede tardar varios segundos; no bloquea la captura de la siguiente ubicación.
+      window.setTimeout(async()=>{
+        try{
+          const refreshed=await refreshSharedData(matchesSavedPosition);
+          if(refreshed){localStorage.setItem(KEY,JSON.stringify(state.pins));$('recordStatus').textContent='Ubicación sincronizada con Google Sheets.';}
+          else{
+            if(!state.pins.some(item=>locationMatches(item,pin)&&Math.abs(Number(item.x)-Number(pin.x))<1e-6&&Math.abs(Number(item.y)-Number(pin.y))<1e-6)){const index=state.pins.findIndex(item=>locationMatches(item,pin));if(index<0)state.pins.push(pin);else state.pins[index]={...state.pins[index],...pin};render();renderTerritoryList();renderHome();}
+            $('recordStatus').textContent='La ubicación se muestra en este navegador, pero no se confirmó la sincronización. Verifica la conexión con Google Sheets.';
+          }
+        }catch(error){$('recordStatus').textContent=`La ubicación se guardó; no se pudo confirmar la sincronización: ${error.message}`;}
+      },350);
     }catch(err){button.disabled=false;button.textContent=draft.mode==='move'?'Guardar nueva ubicación':'Guardar ubicación';$('locationStatus').textContent=`No se pudo guardar la ubicación compartida: ${err.message}`;render();}
   });
   $('cancelSemaphore').addEventListener('click',resetLocationFlow);
