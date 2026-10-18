@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Ubicación de territorios seguros</title>
-  <link rel="preload" as="image" href="plano-2d-limpio-mejorado.png" fetchpriority="high">
+  <link rel="preload" as="image" href="plano-2d-limpio-mejorado.png?v=20261017b" fetchpriority="high">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     :root { color-scheme:light; --ink:#182230; --muted:#637083; --blue:#1769aa; --line:#d8e0e9; --page:#f3f6fa; --surface:#fff; --surface-soft:#f7f8fa; --surface-muted:#eef3f8; --table-head:#eef3f7; --table-row:#e7eef5; }
@@ -76,7 +76,6 @@
     body.map-fullscreen .map-card { position:relative; width:100%; height:100%; min-width:0; padding:0; overflow:hidden; border:0; border-radius:0; background:#000; box-shadow:none; }
     body.map-fullscreen .map-wrap { position:absolute; top:50%; left:50%; width:min(100vw, 175.6dvh); height:min(100dvh, 56.96vw); transform:translate(calc(-50% + var(--map-pan-x,0px)),calc(-50% + var(--map-pan-y,0px))) scale(var(--map-zoom,1)); transform-origin:center center; overflow:hidden; border-radius:0; background:#000; cursor:default; touch-action:none; }
     body.map-fullscreen .map-wrap img { width:100%; height:100%; object-fit:fill; }
-    body.map-fullscreen #overlay { pointer-events:none; }
     #fullscreenExitButton { display:none; }
     body.map-fullscreen #fullscreenExitButton { display:block; position:fixed; z-index:1002; top:max(12px,env(safe-area-inset-top)); right:max(12px,env(safe-area-inset-right)); width:auto; min-width:44px; min-height:44px; padding:8px 12px; border:1px solid #ffffff70; background:#10231fcc; color:#fff; opacity:.14; transition:opacity .18s ease; }
     body.map-fullscreen #fullscreenExitButton:hover,body.map-fullscreen #fullscreenExitButton:focus-visible { opacity:1; }
@@ -91,7 +90,8 @@
     .pin circle.blink { animation:blink 1s steps(2,end) infinite }
     @keyframes blink { 50% { opacity:.22; filter:drop-shadow(0 0 8px currentColor) } }
     .pin.selected circle { stroke:#17202a; stroke-width:4 }
-    .pin text { font:700 16px "Segoe UI",Arial,sans-serif; paint-order:stroke; stroke:white; stroke-width:3px; stroke-linejoin:round; fill:#17202a; text-anchor:middle; pointer-events:none }
+    .pin text { display:none; font:700 16px "Segoe UI",Arial,sans-serif; paint-order:stroke; stroke:white; stroke-width:3px; stroke-linejoin:round; fill:#17202a; text-anchor:middle; pointer-events:none }
+    .pin:hover text,.pin.selected text { display:block }
     .empty { padding:36px 18px; text-align:center; color:var(--muted); line-height:1.5 }
     .summary-view { padding:18px; }
     .summary-view[hidden] { display:none }
@@ -415,7 +415,7 @@
       <div class="map-top"><h2>Plano general</h2><div class="map-controls"><span class="legend"><span style="color:#159447">● Verde: No</span> &nbsp; <span style="color:#d92d20">● Rojo + !: Sí</span> &nbsp; <span style="color:#d92d20">● Rojo: sin check del turno</span></span><button id="deleteLocation" class="secondary" type="button" hidden>Eliminar semáforo</button><button id="cancelPlacement" class="secondary" type="button" hidden>Cancelar</button><button id="confirmLocation" type="button" hidden>Confirmar ubicación</button><button id="sidebarToggle" class="secondary" type="button">Ver mapa completo</button></div></div>
       <div class="placement-hint" id="placementHint" role="status"></div>
       <div class="map-wrap" id="mapWrap">
-        <img id="layoutImage" src="plano-2d-limpio-mejorado.png" data-asset-src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta" decoding="async" fetchpriority="high">
+        <img id="layoutImage" src="plano-2d-limpio-mejorado.png?v=20261017b" data-asset-src="plano-2d-limpio-mejorado.png?v=20261017b" alt="Plano general de la planta" decoding="async" fetchpriority="high">
         <svg id="overlay" viewBox="0 0 2048 1166" aria-label="Marcadores de ubicación"></svg>
       </div>
       <div id="mapMessage" class="empty">Agrega una ubicación y asígnale un territorio. Los datos del panel se actualizan desde el archivo publicado.</div>
@@ -785,7 +785,7 @@
   async function loadLayoutImageFromCache(){
     if(getCacheConsent()!=='yes')return false;
     const image=$('layoutImage'),assetUrl=new URL(image.dataset.assetSrc||image.getAttribute('src'),document.baseURI).href;
-    const cached=await readCache('layout-image',7*24*60*60*1000);
+    const cached=await readCache('layout-image-v2',7*24*60*60*1000);
     if(!cached||cached.assetUrl!==assetUrl||!(cached.blob instanceof Blob))return false;
     if(layoutImageObjectUrl)URL.revokeObjectURL(layoutImageObjectUrl);
     layoutImageObjectUrl=URL.createObjectURL(cached.blob);image.src=layoutImageObjectUrl;return true;
@@ -793,13 +793,13 @@
   async function cacheLayoutImage(){
     if(getCacheConsent()!=='yes')return;
     const image=$('layoutImage'),assetUrl=new URL(image.dataset.assetSrc||image.getAttribute('src'),document.baseURI).href;
-    const cached=await readCache('layout-image',7*24*60*60*1000);if(cached?.assetUrl===assetUrl&&cached.blob instanceof Blob)return;
-    try{const response=await fetch(assetUrl,{cache:'force-cache'});if(!response.ok)throw new Error(`HTTP ${response.status}`);const blob=await response.blob();if(blob.size)await writeCache('layout-image',{assetUrl,blob});}catch{}
+    const cached=await readCache('layout-image-v2',7*24*60*60*1000);if(cached?.assetUrl===assetUrl&&cached.blob instanceof Blob)return;
+    try{const response=await fetch(assetUrl,{cache:'force-cache'});if(!response.ok)throw new Error(`HTTP ${response.status}`);const blob=await response.blob();if(blob.size)await writeCache('layout-image-v2',{assetUrl,blob});}catch{}
   }
   async function initializeLayoutCache(){const restored=await loadLayoutImageFromCache();if(!restored)cacheLayoutImage();}
   function clearLocalCache(){if('indexedDB' in window){const request=indexedDB.deleteDatabase(CACHE_DB);request.onerror=()=>{};}}
   function applyCachedInventory(rows){if(!Array.isArray(rows)||!rows.length)return false;state.inventoryRows=rows;state.territoryRows=rows.map(r=>({line:lineForInventoryRow(r),department:r.department,territory:r.territory}));state.territories=[...new Set(rows.map(r=>r.territory))];state.inventoryLoaded=true;populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();render();return true;}
-  function applyCachedAnalytics(cache){if(!cache)return false;if(Array.isArray(cache.records))state.records=cache.records;if(Array.isArray(cache.checks))state.googleChecks=cache.checks;if(Array.isArray(cache.locations))state.pins=cache.locations;if(Array.isArray(cache.exemptions))state.shiftExemptions=new Set(cache.exemptions);state.loaded=Array.isArray(cache.records);if(state.loaded){state.initialRange=cache.range||null;state.shifts=[...new Set(state.records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));$('count').textContent=`${state.territories.length} territorios · datos temporales guardados en este navegador`;$('bookStatus').textContent='Mostrando datos guardados localmente mientras se actualiza la conexión…';render();renderTerritoryList();updateSummary();}return state.loaded;}
+  function applyCachedAnalytics(cache){if(!cache)return false;if(Array.isArray(cache.records))state.records=cache.records;if(Array.isArray(cache.checks))state.googleChecks=cache.checks;if(Array.isArray(cache.exemptions))state.shiftExemptions=new Set(cache.exemptions);state.loaded=Array.isArray(cache.records);if(state.loaded){state.initialRange=cache.range||null;state.shifts=[...new Set(state.records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));$('count').textContent=`${state.territories.length} territorios · datos temporales guardados en este navegador`;$('bookStatus').textContent='Mostrando datos guardados localmente mientras se actualiza la conexión…';render();renderTerritoryList();updateSummary();}return state.loaded;}
   $('acceptCache').addEventListener('click',()=>{setCacheConsent('yes');$('cacheConsent').hidden=true;initializeLayoutCache();loadInventoryData();loadPublicData();});
   $('rejectCache').addEventListener('click',()=>{setCacheConsent('no');clearLocalCache();$('cacheConsent').hidden=true;});
   if(!getCacheConsent())$('cacheConsent').hidden=false;else $('cacheConsent').hidden=true;
@@ -831,7 +831,7 @@
           renderReports();renderHome();renderTerritoryList();
         }else throw new Error('El Apps Script publicado debe actualizarse para incluir las excepciones NA. Vuelve a desplegar la versión nueva de Code.gs.');
         const records=(payload.records||[]).map(normalizeCheckRecord).filter(Boolean);
-        state.records=records;state.initialRange=payload.range||null;state.googleChecks=(payload.statuses||[]).map(r=>({territory:norm(r.territory||r.territorio),department:norm(r.department||r.departamento),shift:norm(r.shift||r.turno),timestamp:r.timestamp||r.recordedAt||'',imminentRisk:r.imminentRisk??r.pregunta15??r.q15??''}));writeCache('analytics',{records,range:state.initialRange,checks:state.googleChecks,locations:state.pins,exemptions:[...state.shiftExemptions]});state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
+        state.records=records;state.initialRange=payload.range||null;state.googleChecks=(payload.statuses||[]).map(r=>({territory:norm(r.territory||r.territorio),department:norm(r.department||r.departamento),shift:norm(r.shift||r.turno),timestamp:r.timestamp||r.recordedAt||'',imminentRisk:r.imminentRisk??r.pregunta15??r.q15??''}));writeCache('analytics',{records,range:state.initialRange,checks:state.googleChecks,exemptions:[...state.shiftExemptions]});state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas del periodo reciente`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
         $('recordStatus').textContent=state.sharedMigrationDone?'Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 15 segundos.':'Conexión compartida activa. Sincronizando ubicaciones y registros guardados anteriormente en este navegador…';
@@ -926,51 +926,24 @@
     const mark=document.createElementNS('http://www.w3.org/2000/svg','text');mark.setAttribute('x',String(11*unit));mark.setAttribute('y',String(-7.5*unit));mark.style.fill='white';mark.style.stroke='none';mark.style.fontSize=String(10*unit)+'px';mark.style.fontWeight='800';mark.style.textAnchor='middle';mark.textContent='!';
     group.append(badge,mark);
   }
-  function calculateLabelLayout(items,unit){
-    const placed=[],result=new Map(),gap=2*unit,stepX=30*unit,stepY=20*unit;
-    const ordered=[...items].sort((a,b)=>Number(b.priority)-Number(a.priority)||b.territory.length-a.territory.length);
-    for(const item of ordered){
-      const width=Math.max(24*unit,item.territory.length*7.4*unit),height=17*unit,options=[];
-      const add=(cx,cy,rotation=0,penalty=0)=>{const w=rotation?height:width,h=rotation?width:height;if(cx-w/2<gap||cx+w/2>2048-gap||cy-h/2<gap||cy+h/2>1166-gap)return;options.push({cx,cy,rotation,w,h,score:Math.hypot(cx-item.x,cy-item.y)+penalty});};
-      for(const radius of [13,21,31,44,60,82].map(value=>value*unit))for(let angle=0;angle<Math.PI*2;angle+=Math.PI/4){add(item.x+Math.cos(angle)*radius,item.y+Math.sin(angle)*radius,0);}
-      add(item.x,item.y-15*unit,0,0);
-      options.sort((a,b)=>a.score-b.score);
-      let chosen=options.find(box=>placed.every(other=>box.cx+box.w/2+gap<=other.left||box.cx-box.w/2-gap>=other.right||box.cy+box.h/2+gap<=other.top||box.cy-box.h/2-gap>=other.bottom));
-      if(!chosen){
-        // Reubica etiquetas congestionadas en espacios libres del plano; usa vertical si eso ayuda a conservar el vínculo visual.
-        outer: for(const rotation of [0,90])for(let y=height;y<1166-height;y+=stepY)for(let x=width;x<2048-width;x+=stepX){
-          const candidate={cx:x,cy:y,rotation,w:rotation?height:width,h:rotation?width:height};
-          if(candidate.cx-candidate.w/2<gap||candidate.cx+candidate.w/2>2048-gap||candidate.cy-candidate.h/2<gap||candidate.cy+candidate.h/2>1166-gap)continue;
-          if(placed.every(other=>candidate.cx+candidate.w/2+gap<=other.left||candidate.cx-candidate.w/2-gap>=other.right||candidate.cy+candidate.h/2+gap<=other.top||candidate.cy-candidate.h/2-gap>=other.bottom)){chosen=candidate;break outer;}
-        }
-      }
-      if(!chosen)chosen={cx:item.x,cy:item.y-18*unit,rotation:0,w:width,h:height};
-      chosen.left=chosen.cx-chosen.w/2;chosen.right=chosen.cx+chosen.w/2;chosen.top=chosen.cy-chosen.h/2;chosen.bottom=chosen.cy+chosen.h/2;placed.push(chosen);result.set(item.id,chosen);
-    }
-    return result;
-  }
   function render(){
     renderTurnWindow=currentTurnWindow();
     const unit=2048/Math.max(280,$('mapWrap').clientWidth||280);
     const svg=$('overlay'); svg.innerHTML='';
-    const labelItems=state.pins.filter(p=>!(state.locationDraft?.mode==='move'&&p.id===state.locationDraft.pinId)).map(p=>({id:p.id,x:Number(p.x)*2048,y:Number(p.y)*1166,territory:p.territory,priority:p.id===state.selected?2:0}));
-    if(state.locationDraft?.x!==undefined&&state.locationDraft?.x!==null)labelItems.push({id:'__draft__',x:state.locationDraft.x*2048,y:state.locationDraft.y*1166,territory:state.locationDraft.territory,priority:3});
-    const labelLayout=calculateLabelLayout(labelItems,unit);
-    for(const item of labelItems){const label=labelLayout.get(item.id);if(Math.hypot(label.cx-item.x,label.cy-item.y)>20*unit){const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('x1',String(item.x));line.setAttribute('y1',String(item.y));line.setAttribute('x2',String(label.cx));line.setAttribute('y2',String(label.cy));line.setAttribute('stroke','#17202a');line.setAttribute('stroke-width',String(1.4*unit));line.setAttribute('stroke-dasharray',`${2*unit} ${2*unit}`);line.setAttribute('opacity','.68');svg.append(line);}}
     for(const p of state.pins){
       if(state.locationDraft?.mode==='move'&&p.id===state.locationDraft.pinId)continue;
       const status=pinRiskStatus(p.department,p.territory), color=status==='safe'?colors.done:colors.missing;
       const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','pin'+(p.id===state.selected?' selected':'')); g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`); g.dataset.id=p.id;
       const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('r',String(7*unit)); c.setAttribute('fill',color); c.style.color=color;c.style.strokeWidth=String((p.id===state.selected?4:3)*unit)+'px'; c.setAttribute('class','blink');
-      const t=document.createElementNS('http://www.w3.org/2000/svg','text'),label=labelLayout.get(p.id),lx=label.cx-Number(p.x)*2048,ly=label.cy-Number(p.y)*1166;t.setAttribute('x',String(lx));t.setAttribute('y',String(ly+6.5*unit));if(label.rotation)t.setAttribute('transform',`rotate(${label.rotation} ${lx} ${ly})`);t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory; g.setAttribute('aria-label',`${p.department} · ${p.territory} · ${status==='safe'?'sin riesgo reportado en el turno actual':status==='alert'?'peligro reportado en el turno actual':'sin check en el turno actual'}`);
-      g.append(c,t);if(status==='alert')appendDangerBadge(g,unit);g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;}); svg.append(g);
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y',String(-13*unit));t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory; g.setAttribute('aria-label',`${p.department} · ${p.territory} · ${status==='safe'?'sin riesgo reportado en el turno actual':status==='alert'?'peligro reportado en el turno actual':'sin check en el turno actual'}`);g.setAttribute('tabindex','0');g.setAttribute('role','button');
+      g.append(c,t);if(status==='alert')appendDangerBadge(g,unit);g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;render();});g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();state.selected=p.id;render();}}); svg.append(g);
     }
     if(state.locationDraft?.x!==undefined&&state.locationDraft?.x!==null){
       const p=state.locationDraft,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','pin selected');g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`);
       const draftStatus=p.mode==='move'?pinRiskStatus(p.department,p.territory):'draft';
       const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',String(7*unit));c.setAttribute('fill',draftStatus==='safe'?colors.done:draftStatus==='draft'?colors.unmapped:colors.missing);c.style.strokeWidth=String(4*unit)+'px';c.setAttribute('class','blink');
       if(p.mode==='move'){g.dataset.draftPin='true';g.style.cursor='grab';g.style.touchAction='none';}
-      const t=document.createElementNS('http://www.w3.org/2000/svg','text'),label=labelLayout.get('__draft__'),lx=label.cx-p.x*2048,ly=label.cy-p.y*1166;t.setAttribute('x',String(lx));t.setAttribute('y',String(ly+6.5*unit));if(label.rotation)t.setAttribute('transform',`rotate(${label.rotation} ${lx} ${ly})`);t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);if(draftStatus==='alert')appendDangerBadge(g,unit);svg.append(g);
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y',String(-13*unit));t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);if(draftStatus==='alert')appendDangerBadge(g,unit);svg.append(g);
     }
     $('mapWrap').style.cursor=state.locationDraft?.mode==='move'?'grab':state.placementMode?'crosshair':'default';
     $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 15 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
@@ -1253,9 +1226,9 @@
     });
   }
   $('overlay').addEventListener('click',ev=>{
-    if(!state.placementMode||!state.locationDraft)return;
+    if(!state.placementMode||!state.locationDraft){if(!ev.target.closest('.pin')&&state.selected){state.selected=null;render();}return;}
     if(state.locationDraft.mode==='move')return;
-    const rect=$('mapWrap').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
+    const rect=$('layoutImage').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
     state.locationDraft.x=Math.max(0,Math.min(1,x));state.locationDraft.y=Math.max(0,Math.min(1,y));state.placementMode=false;$('confirmLocation').hidden=false;$('cancelPlacement').hidden=false;$('placementHint').textContent='Revisa la marca azul; pulsa “Confirmar ubicación” para regresar al formulario.';render();
   });
   $('overlay').addEventListener('pointerdown',ev=>{
@@ -1264,7 +1237,7 @@
   });
   $('overlay').addEventListener('pointermove',ev=>{
     if(!state.draggingPin||!state.locationDraft)return;
-    const rect=$('mapWrap').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
+    const rect=$('layoutImage').getBoundingClientRect(),x=(ev.clientX-rect.left)/rect.width,y=(ev.clientY-rect.top)/rect.height;
     state.locationDraft.x=Math.max(0,Math.min(1,x));state.locationDraft.y=Math.max(0,Math.min(1,y));
     const marker=$('overlay').querySelector('[data-draft-pin]');if(marker)marker.setAttribute('transform',`translate(${state.locationDraft.x*2048},${state.locationDraft.y*1166})`);
   });
