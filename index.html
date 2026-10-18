@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Ubicación de territorios seguros</title>
+  <link rel="preload" as="image" href="plano-2d-limpio-mejorado.png" fetchpriority="high">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     :root { color-scheme:light; --ink:#182230; --muted:#637083; --blue:#1769aa; --line:#d8e0e9; --page:#f3f6fa; --surface:#fff; --surface-soft:#f7f8fa; --surface-muted:#eef3f8; --table-head:#eef3f7; --table-row:#e7eef5; }
@@ -354,7 +355,7 @@
   </style>
 </head>
 <body>
-  <div id="cacheConsent" class="cache-consent" role="dialog" aria-label="Preferencia de caché local" hidden><p><strong>Mejorar la carga de esta página</strong><br>¿Permites guardar una copia temporal de los datos de territorios y checks en este navegador? Esto puede acelerar futuras visitas. Tus filtros y búsquedas permanecen solo en este navegador.</p><div class="cache-consent-actions"><button id="acceptCache" type="button">Permitir caché local</button><button id="rejectCache" class="secondary" type="button">Continuar sin guardar</button></div></div>
+  <div id="cacheConsent" class="cache-consent" role="dialog" aria-label="Preferencia de caché local" hidden><p><strong>Mejorar la carga de esta página</strong><br>¿Permites guardar una copia temporal del plano y de los datos de territorios y checks en este navegador? Esto puede acelerar futuras visitas. Tus filtros y búsquedas permanecen solo en este navegador.</p><div class="cache-consent-actions"><button id="acceptCache" type="button">Permitir caché local</button><button id="rejectCache" class="secondary" type="button">Continuar sin guardar</button></div></div>
   <header><h1>Territorio Seguro</h1><p>Reportes, ubicaciones y seguimiento de riesgos.</p><nav class="views" aria-label="Menú principal"><button id="homeTab" class="active" type="button">Inicio</button><button id="registerTab" type="button">Registrar</button><button id="recordsTab" type="button">Gestión de registros</button><button id="mapTab" type="button">Mapa de riesgo</button><button id="summaryTab" type="button">Análisis detallado</button></nav></header>
   <section id="homeView" class="workspace-view">
     <div class="workspace-head"><div><h2>Panel de Territorio Seguro</h2><div class="summary-note">Registra condiciones y eventos, consulta reportes y ubica los riesgos en el plano.</div></div></div>
@@ -414,7 +415,7 @@
       <div class="map-top"><h2>Plano general</h2><div class="map-controls"><span class="legend"><span style="color:#159447">● Verde: No</span> &nbsp; <span style="color:#d92d20">● Rojo + !: Sí</span> &nbsp; <span style="color:#d92d20">● Rojo: sin check del turno</span></span><button id="deleteLocation" class="secondary" type="button" hidden>Eliminar semáforo</button><button id="cancelPlacement" class="secondary" type="button" hidden>Cancelar</button><button id="confirmLocation" type="button" hidden>Confirmar ubicación</button><button id="sidebarToggle" class="secondary" type="button">Ver mapa completo</button></div></div>
       <div class="placement-hint" id="placementHint" role="status"></div>
       <div class="map-wrap" id="mapWrap">
-        <img src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta">
+        <img id="layoutImage" src="plano-2d-limpio-mejorado.png" data-asset-src="plano-2d-limpio-mejorado.png" alt="Plano general de la planta" decoding="async" fetchpriority="high">
         <svg id="overlay" viewBox="0 0 2048 1166" aria-label="Marcadores de ubicación"></svg>
       </div>
       <div id="mapMessage" class="empty">Agrega una ubicación y asígnale un territorio. Los datos del panel se actualizan desde el archivo publicado.</div>
@@ -780,10 +781,26 @@
   function openLocalCache(){return new Promise((resolve,reject)=>{if(!('indexedDB' in window)){reject(new Error('El navegador no ofrece caché local.'));return;}const request=indexedDB.open(CACHE_DB,1);request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('snapshots'))request.result.createObjectStore('snapshots');};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
   async function writeCache(key,value){if(getCacheConsent()!=='yes')return;let db;try{db=await openLocalCache();await new Promise((resolve,reject)=>{const tx=db.transaction('snapshots','readwrite');tx.objectStore('snapshots').put({savedAt:Date.now(),value},key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}catch{}finally{db?.close();}}
   async function readCache(key,maxAge=300000){if(getCacheConsent()!=='yes')return null;let db;try{db=await openLocalCache();return await new Promise((resolve,reject)=>{const tx=db.transaction('snapshots','readonly'),request=tx.objectStore('snapshots').get(key);request.onsuccess=()=>{const item=request.result;resolve(item&&Date.now()-item.savedAt<=maxAge?item.value:null);};request.onerror=()=>reject(request.error);});}catch{return null;}finally{db?.close();}}
+  let layoutImageObjectUrl=null;
+  async function loadLayoutImageFromCache(){
+    if(getCacheConsent()!=='yes')return false;
+    const image=$('layoutImage'),assetUrl=new URL(image.dataset.assetSrc||image.getAttribute('src'),document.baseURI).href;
+    const cached=await readCache('layout-image',7*24*60*60*1000);
+    if(!cached||cached.assetUrl!==assetUrl||!(cached.blob instanceof Blob))return false;
+    if(layoutImageObjectUrl)URL.revokeObjectURL(layoutImageObjectUrl);
+    layoutImageObjectUrl=URL.createObjectURL(cached.blob);image.src=layoutImageObjectUrl;return true;
+  }
+  async function cacheLayoutImage(){
+    if(getCacheConsent()!=='yes')return;
+    const image=$('layoutImage'),assetUrl=new URL(image.dataset.assetSrc||image.getAttribute('src'),document.baseURI).href;
+    const cached=await readCache('layout-image',7*24*60*60*1000);if(cached?.assetUrl===assetUrl&&cached.blob instanceof Blob)return;
+    try{const response=await fetch(assetUrl,{cache:'force-cache'});if(!response.ok)throw new Error(`HTTP ${response.status}`);const blob=await response.blob();if(blob.size)await writeCache('layout-image',{assetUrl,blob});}catch{}
+  }
+  async function initializeLayoutCache(){const restored=await loadLayoutImageFromCache();if(!restored)cacheLayoutImage();}
   function clearLocalCache(){if('indexedDB' in window){const request=indexedDB.deleteDatabase(CACHE_DB);request.onerror=()=>{};}}
   function applyCachedInventory(rows){if(!Array.isArray(rows)||!rows.length)return false;state.inventoryRows=rows;state.territoryRows=rows.map(r=>({line:lineForInventoryRow(r),department:r.department,territory:r.territory}));state.territories=[...new Set(rows.map(r=>r.territory))];state.inventoryLoaded=true;populateDepartments();populateLocationDepartments();updateTerritoryOptions();renderTerritoryList();render();return true;}
   function applyCachedAnalytics(cache){if(!cache)return false;if(Array.isArray(cache.records))state.records=cache.records;if(Array.isArray(cache.checks))state.googleChecks=cache.checks;if(Array.isArray(cache.locations))state.pins=cache.locations;if(Array.isArray(cache.exemptions))state.shiftExemptions=new Set(cache.exemptions);state.loaded=Array.isArray(cache.records);if(state.loaded){state.initialRange=cache.range||null;state.shifts=[...new Set(state.records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));$('count').textContent=`${state.territories.length} territorios · datos temporales guardados en este navegador`;$('bookStatus').textContent='Mostrando datos guardados localmente mientras se actualiza la conexión…';render();renderTerritoryList();updateSummary();}return state.loaded;}
-  $('acceptCache').addEventListener('click',()=>{setCacheConsent('yes');$('cacheConsent').hidden=true;loadInventoryData();loadPublicData();});
+  $('acceptCache').addEventListener('click',()=>{setCacheConsent('yes');$('cacheConsent').hidden=true;initializeLayoutCache();loadInventoryData();loadPublicData();});
   $('rejectCache').addEventListener('click',()=>{setCacheConsent('no');clearLocalCache();$('cacheConsent').hidden=true;});
   if(!getCacheConsent())$('cacheConsent').hidden=false;else $('cacheConsent').hidden=true;
   async function loadPublicData(){
@@ -909,16 +926,43 @@
     const mark=document.createElementNS('http://www.w3.org/2000/svg','text');mark.setAttribute('x',String(11*unit));mark.setAttribute('y',String(-7.5*unit));mark.style.fill='white';mark.style.stroke='none';mark.style.fontSize=String(10*unit)+'px';mark.style.fontWeight='800';mark.style.textAnchor='middle';mark.textContent='!';
     group.append(badge,mark);
   }
+  function calculateLabelLayout(items,unit){
+    const placed=[],result=new Map(),gap=2*unit,stepX=30*unit,stepY=20*unit;
+    const ordered=[...items].sort((a,b)=>Number(b.priority)-Number(a.priority)||b.territory.length-a.territory.length);
+    for(const item of ordered){
+      const width=Math.max(24*unit,item.territory.length*7.4*unit),height=17*unit,options=[];
+      const add=(cx,cy,rotation=0,penalty=0)=>{const w=rotation?height:width,h=rotation?width:height;if(cx-w/2<gap||cx+w/2>2048-gap||cy-h/2<gap||cy+h/2>1166-gap)return;options.push({cx,cy,rotation,w,h,score:Math.hypot(cx-item.x,cy-item.y)+penalty});};
+      for(const radius of [13,21,31,44,60,82].map(value=>value*unit))for(let angle=0;angle<Math.PI*2;angle+=Math.PI/4){add(item.x+Math.cos(angle)*radius,item.y+Math.sin(angle)*radius,0);}
+      add(item.x,item.y-15*unit,0,0);
+      options.sort((a,b)=>a.score-b.score);
+      let chosen=options.find(box=>placed.every(other=>box.cx+box.w/2+gap<=other.left||box.cx-box.w/2-gap>=other.right||box.cy+box.h/2+gap<=other.top||box.cy-box.h/2-gap>=other.bottom));
+      if(!chosen){
+        // Reubica etiquetas congestionadas en espacios libres del plano; usa vertical si eso ayuda a conservar el vínculo visual.
+        outer: for(const rotation of [0,90])for(let y=height;y<1166-height;y+=stepY)for(let x=width;x<2048-width;x+=stepX){
+          const candidate={cx:x,cy:y,rotation,w:rotation?height:width,h:rotation?width:height};
+          if(candidate.cx-candidate.w/2<gap||candidate.cx+candidate.w/2>2048-gap||candidate.cy-candidate.h/2<gap||candidate.cy+candidate.h/2>1166-gap)continue;
+          if(placed.every(other=>candidate.cx+candidate.w/2+gap<=other.left||candidate.cx-candidate.w/2-gap>=other.right||candidate.cy+candidate.h/2+gap<=other.top||candidate.cy-candidate.h/2-gap>=other.bottom)){chosen=candidate;break outer;}
+        }
+      }
+      if(!chosen)chosen={cx:item.x,cy:item.y-18*unit,rotation:0,w:width,h:height};
+      chosen.left=chosen.cx-chosen.w/2;chosen.right=chosen.cx+chosen.w/2;chosen.top=chosen.cy-chosen.h/2;chosen.bottom=chosen.cy+chosen.h/2;placed.push(chosen);result.set(item.id,chosen);
+    }
+    return result;
+  }
   function render(){
     renderTurnWindow=currentTurnWindow();
     const unit=2048/Math.max(280,$('mapWrap').clientWidth||280);
     const svg=$('overlay'); svg.innerHTML='';
+    const labelItems=state.pins.filter(p=>!(state.locationDraft?.mode==='move'&&p.id===state.locationDraft.pinId)).map(p=>({id:p.id,x:Number(p.x)*2048,y:Number(p.y)*1166,territory:p.territory,priority:p.id===state.selected?2:0}));
+    if(state.locationDraft?.x!==undefined&&state.locationDraft?.x!==null)labelItems.push({id:'__draft__',x:state.locationDraft.x*2048,y:state.locationDraft.y*1166,territory:state.locationDraft.territory,priority:3});
+    const labelLayout=calculateLabelLayout(labelItems,unit);
+    for(const item of labelItems){const label=labelLayout.get(item.id);if(Math.hypot(label.cx-item.x,label.cy-item.y)>20*unit){const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('x1',String(item.x));line.setAttribute('y1',String(item.y));line.setAttribute('x2',String(label.cx));line.setAttribute('y2',String(label.cy));line.setAttribute('stroke','#17202a');line.setAttribute('stroke-width',String(1.4*unit));line.setAttribute('stroke-dasharray',`${2*unit} ${2*unit}`);line.setAttribute('opacity','.68');svg.append(line);}}
     for(const p of state.pins){
       if(state.locationDraft?.mode==='move'&&p.id===state.locationDraft.pinId)continue;
       const status=pinRiskStatus(p.department,p.territory), color=status==='safe'?colors.done:colors.missing;
       const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','pin'+(p.id===state.selected?' selected':'')); g.setAttribute('transform',`translate(${p.x*2048},${p.y*1166})`); g.dataset.id=p.id;
       const c=document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('r',String(7*unit)); c.setAttribute('fill',color); c.style.color=color;c.style.strokeWidth=String((p.id===state.selected?4:3)*unit)+'px'; c.setAttribute('class','blink');
-      const t=document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('y',String(-13*unit));t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px'; t.textContent=p.territory; g.setAttribute('aria-label',`${p.department} · ${p.territory} · ${status==='safe'?'sin riesgo reportado en el turno actual':status==='alert'?'peligro reportado en el turno actual':'sin check en el turno actual'}`);
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text'),label=labelLayout.get(p.id),lx=label.cx-Number(p.x)*2048,ly=label.cy-Number(p.y)*1166;t.setAttribute('x',String(lx));t.setAttribute('y',String(ly+6.5*unit));if(label.rotation)t.setAttribute('transform',`rotate(${label.rotation} ${lx} ${ly})`);t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory; g.setAttribute('aria-label',`${p.department} · ${p.territory} · ${status==='safe'?'sin riesgo reportado en el turno actual':status==='alert'?'peligro reportado en el turno actual':'sin check en el turno actual'}`);
       g.append(c,t);if(status==='alert')appendDangerBadge(g,unit);g.addEventListener('click',ev=>{ev.stopPropagation();state.selected=p.id;}); svg.append(g);
     }
     if(state.locationDraft?.x!==undefined&&state.locationDraft?.x!==null){
@@ -926,7 +970,7 @@
       const draftStatus=p.mode==='move'?pinRiskStatus(p.department,p.territory):'draft';
       const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',String(7*unit));c.setAttribute('fill',draftStatus==='safe'?colors.done:draftStatus==='draft'?colors.unmapped:colors.missing);c.style.strokeWidth=String(4*unit)+'px';c.setAttribute('class','blink');
       if(p.mode==='move'){g.dataset.draftPin='true';g.style.cursor='grab';g.style.touchAction='none';}
-      const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('y',String(-13*unit));t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);if(draftStatus==='alert')appendDangerBadge(g,unit);svg.append(g);
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text'),label=labelLayout.get('__draft__'),lx=label.cx-p.x*2048,ly=label.cy-p.y*1166;t.setAttribute('x',String(lx));t.setAttribute('y',String(ly+6.5*unit));if(label.rotation)t.setAttribute('transform',`rotate(${label.rotation} ${lx} ${ly})`);t.style.fontSize=String(12*unit)+'px';t.style.strokeWidth=String(3*unit)+'px';t.textContent=p.territory;g.setAttribute('aria-label',`${p.department} · ${p.territory}`);g.append(c,t);if(draftStatus==='alert')appendDangerBadge(g,unit);svg.append(g);
     }
     $('mapWrap').style.cursor=state.locationDraft?.mode==='move'?'grab':state.placementMode?'crosshair':'default';
     $('mapMessage').textContent=!state.loaded?'Los marcadores se mostrarán cuando se confirme la conexión con Google Sheets.':state.pins.length?`${state.pins.length} semáforo(s) compartidos. El color refleja el check del turno actual: verde = No; rojo con ! = Sí; rojo sin ! = sin check. Actualización automática cada 15 segundos.`:'No hay marcadores registrados en Google Sheets. Agrega un semáforo para compartirlo con todos.';
@@ -1227,7 +1271,7 @@
   $('overlay').addEventListener('pointerup',ev=>{
     if(!state.draggingPin)return;state.draggingPin=false;
     if($('overlay').hasPointerCapture(ev.pointerId))$('overlay').releasePointerCapture(ev.pointerId);
-    $('placementHint').textContent='Suelta el semáforo en el lugar correcto. Puedes seguir arrastrándolo o confirmar la ubicación.';
+    $('placementHint').textContent='Suelta el semáforo en el lugar correcto. Puedes seguir arrastrándolo o confirmar la ubicación.';render();
   });
   $('overlay').addEventListener('pointercancel',()=>{state.draggingPin=false;});
   let resizeFrame=0;
@@ -1235,7 +1279,7 @@
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
   (async()=>{
-    if(getCacheConsent()==='yes'){const inventory=await readCache('inventory',1800000);applyCachedInventory(inventory);const analytics=await readCache('analytics',300000);applyCachedAnalytics(analytics);restoreLocalPreferences();renderReports();renderTerritoryList();renderWeeklyTable();}
+    if(getCacheConsent()==='yes'){initializeLayoutCache();const inventory=await readCache('inventory',1800000);applyCachedInventory(inventory);const analytics=await readCache('analytics',300000);applyCachedAnalytics(analytics);restoreLocalPreferences();renderReports();renderTerritoryList();renderWeeklyTable();}
     loadInventoryData().then(()=>{restoreLocalPreferences();loadPublicData().then(loadHomePeriodReports);});
   })();
   setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},60000);
