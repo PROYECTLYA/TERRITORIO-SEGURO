@@ -132,6 +132,12 @@
     .weekly-table .shift-slot.future { color:#697586; background:#f3f5f7; }
     .weekly-table .shift-slot:hover { filter:brightness(.96); }
     .weekly-table .shift-slot:focus-visible { outline:3px solid #80b7e1; outline-offset:1px; }
+    #naAuthDialog { width:min(420px,calc(100vw - 28px)); padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); box-shadow:0 16px 48px #0007; }
+    #naAuthDialog::backdrop { background:#06111dcc; }
+    #naAuthDialog h2 { margin:0 0 6px; }
+    #naAuthDialog p { margin:0 0 12px; color:var(--muted); font-size:13px; }
+    #naAuthDialog menu { display:flex; justify-content:flex-end; gap:8px; padding:0; margin:16px 0 0; }
+    #naAuthDialog menu button { width:auto; }
     .weekly-table td.na-cell { color:#475467; background:#e9edf2; font-weight:700; }
     .weekly-table .area-row td { background:#e7eef5; color:#183b58; font-weight:750; border-top:2px solid #c8d4e0 }
     .weekly-table .area-row td:first-child { text-align:left }
@@ -391,6 +397,7 @@
     <div class="area-charts"><div class="panel"><h3>Cumplimiento Semanal</h3><div id="weeklyChartCaption" class="summary-note">Acumulado hasta el día y turno vigente, agrupado por área.</div><div id="weeklyAreaChart" class="area-chart-wrap"><div class="empty-summary">Cargando datos publicados…</div></div><div class="chart-legend">Rojo: menor de 80% · Amarillo: 80–89% · Verde: 90% o más</div></div><div class="panel"><h3>D-1</h3><div id="d1ChartCaption" class="summary-note">Cumplimiento del día calendario anterior, considerando sus tres turnos.</div><div id="d1AreaChart" class="area-chart-wrap"><div class="empty-summary">Cargando datos publicados…</div></div><div class="chart-legend">Rojo: menor de 80% · Amarillo: 80–89% · Verde: 90% o más</div></div></div>
     <div class="panel"><div class="table-toolbar"><div><h3>Detalle semanal por territorio y turno</h3><div id="tableCaption" class="summary-note">La tabla sigue la estructura de “Territorio Safety”.</div></div><div class="table-actions"><label for="tableWeek">Semana</label><select id="tableWeek" aria-label="Filtrar por semana"></select><button id="exportWeeklyTable" type="button">Exportar a Excel</button><button id="toggleAllShifts" type="button">Mostrar todos los turnos</button><input id="tableSearch" type="search" placeholder="Buscar área o territorio"></div></div><div class="table-wrap"><div id="weeklyTable"><div class="empty-summary">Cargando datos publicados…</div></div></div></div>
   </section>
+<dialog id="naAuthDialog" aria-labelledby="naAuthTitle"><form method="dialog"><h2 id="naAuthTitle">Autorizar cambio de turno</h2><p>Ingresa la contraseña para cambiar la expectativa de este turno a NA o restaurarla.</p><label for="naAuthPassword">Contraseña</label><input id="naAuthPassword" type="password" autocomplete="current-password" required><menu><button type="submit" value="cancel" class="secondary" formnovalidate>Cancelar</button><button type="submit" value="authorize">Autorizar</button></menu></form></dialog>
 <script>
 (() => {
   const KEY='territorios-seguros-ubicaciones-v1';
@@ -404,6 +411,7 @@
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
   let dataLoadPromise=null,inventoryLoadPromise=null,renderTurnWindow=null;
   const $=id=>document.getElementById(id);
+  const NA_CHANGE_PASSWORD='SFT';
   const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], initialRange:null,weekRecordsCache:{},weekLoads:{},historicalReports:[],googleChecks:[],shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
   try { state.userReports=JSON.parse(localStorage.getItem(REPORTS_KEY)||'[]'); if(!Array.isArray(state.userReports))state.userReports=[]; } catch { state.userReports=[]; }
   const hadOwnershipList=localStorage.getItem(OWNED_REPORTS_KEY)!==null;
@@ -1050,6 +1058,8 @@
   $('weeklyTable').addEventListener('click',async ev=>{
     const slot=ev.target.closest('[data-shift-exemption]');
     if(slot){
+      const authorized=await requestNaChangeAuthorization();
+      if(!authorized)return;
       const department=slot.dataset.department,territory=slot.dataset.territory,weekday=Number(slot.dataset.weekday),shift=Number(slot.dataset.shift),key=shiftExemptionKey(department,territory,weekday,shift),notApplicable=!state.shiftExemptions.has(key),label=slot.textContent;
       slot.disabled=true;slot.textContent='…';
       try{
@@ -1064,6 +1074,13 @@
     if(state.collapsedDays.has(day))state.collapsedDays.delete(day);else state.collapsedDays.add(day);
     renderWeeklyTable();
   });
+  function requestNaChangeAuthorization(){
+    const dialog=$('naAuthDialog'),input=$('naAuthPassword');
+    return new Promise(resolve=>{
+      const onClose=()=>{dialog.removeEventListener('close',onClose);const authorized=dialog.returnValue==='authorize'&&input.value===NA_CHANGE_PASSWORD;input.value='';if(dialog.returnValue==='authorize'&&!authorized)window.alert('Contraseña incorrecta. No se realizó ningún cambio.');resolve(authorized);};
+      dialog.addEventListener('close',onClose);dialog.showModal();input.focus();
+    });
+  }
   $('overlay').addEventListener('click',ev=>{
     if(!state.placementMode||!state.locationDraft)return;
     if(state.locationDraft.mode==='move')return;
