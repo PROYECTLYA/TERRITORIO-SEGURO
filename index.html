@@ -180,6 +180,17 @@
     .home-period-name { font-weight:700; }
     .home-period-metric { color:var(--muted); font-size:13px; }
     .home-period-metric strong { display:block; color:var(--ink); font-size:20px; }
+    .metric-button { width:auto; text-align:left; cursor:pointer; color:var(--ink); }
+    .metric-button:hover { border-color:#71a6cd; box-shadow:0 5px 20px #1769aa20; }
+    .home-detail-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+    .home-detail-head h2 { margin:0; }
+    .home-detail-head button { width:auto; }
+    .home-detail-list { display:grid; gap:9px; }
+    .home-detail-item { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; padding:12px; border:1px solid var(--line); border-radius:9px; background:var(--surface); }
+    .home-detail-item.imminent-risk { background:#fff3f1; border-color:#e9a7a1; }
+    .home-detail-item h3 { margin:0 0 4px; font-size:15px; }
+    .home-detail-item p { margin:3px 0; color:var(--muted); font-size:13px; }
+    .home-detail-item button { width:auto; align-self:center; }
     .report-title { font-weight:700 }
     .report-meta { color:var(--muted); font-size:12px; margin-top:4px }
     .report-description { margin:8px 0 0; white-space:pre-wrap; overflow-wrap:anywhere }
@@ -219,7 +230,7 @@
     .question-hint { font-size:12px; color:var(--muted) }
     @media(max-width:850px) { .workspace-grid { grid-template-columns:1fr } }
     @media(max-width:850px) { main { grid-template-columns:1fr } aside { position:static } }
-    @media(max-width:650px) { .summary-cards { grid-template-columns:1fr } .home-period-row { grid-template-columns:1fr 1fr; } .home-period-name { grid-column:1/-1; } .bar-row { grid-template-columns:86px minmax(50px,1fr) 50px } .weekly-table .namecol.c2 { left:115px } .weekly-table .namecol.c3 { left:230px } .weekly-table th.namecol { min-width:115px } }
+    @media(max-width:650px) { .summary-cards { grid-template-columns:1fr } .home-period-row { grid-template-columns:1fr 1fr; } .home-period-name { grid-column:1/-1; } .home-detail-item { grid-template-columns:1fr; } .home-detail-item button { width:100%; } .bar-row { grid-template-columns:86px minmax(50px,1fr) 50px } .weekly-table .namecol.c2 { left:115px } .weekly-table .namecol.c3 { left:230px } .weekly-table th.namecol { min-width:115px } }
     @media(max-width:850px) {
       main { gap:12px; padding:12px }
       aside { top:auto }
@@ -318,6 +329,8 @@
       .report-item.imminent-risk { background:#3b2627; border-color:#75413e; }
       .imminent-chip { background:#5a2e2e; color:#ffd5d1; }
       .home-period-row { background:var(--surface); border-color:var(--line); }
+      .home-detail-item { background:var(--surface); border-color:var(--line); }
+      .home-detail-item.imminent-risk { background:#3b2627; border-color:#75413e; }
       .report-meta,.report-answers { color:var(--muted); }
       .report-answers li strong { color:var(--ink); }
       .risk-chip { background:#402522; color:#ff9991; }
@@ -340,7 +353,8 @@
   <header><h1>Territorio Seguro</h1><p>Reportes, ubicaciones y seguimiento de riesgos.</p><nav class="views" aria-label="Menú principal"><button id="homeTab" class="active" type="button">Inicio</button><button id="registerTab" type="button">Registrar</button><button id="recordsTab" type="button">Gestión de registros</button><button id="mapTab" type="button">Mapa de riesgo</button><button id="summaryTab" type="button">Análisis detallado</button></nav></header>
   <section id="homeView" class="workspace-view">
     <div class="workspace-head"><div><h2>Panel de Territorio Seguro</h2><div class="summary-note">Registra condiciones y eventos, consulta reportes y ubica los riesgos en el plano.</div></div></div>
-    <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Checks cargados</div><div class="metric-value" id="homeReportCount">0</div></div><div class="metric metric-bad"><div class="metric-label">Territorios con riesgo inminente</div><div class="metric-value" id="homeHighCount">0</div></div><div class="metric metric-good"><div class="metric-label">Marcadores en el mapa</div><div class="metric-value" id="homePinCount">0</div></div></div>
+    <div class="summary-cards"><button id="homeChecksCard" class="metric metric-total metric-button" type="button" aria-controls="homeDetailPanel"><span class="metric-label">Checks cargados · ver detalle</span><span class="metric-value" id="homeReportCount">0</span></button><button id="homeRiskCard" class="metric metric-bad metric-button" type="button" aria-controls="homeDetailPanel"><span class="metric-label">Territorios con riesgo inminente · ver detalle</span><span class="metric-value" id="homeHighCount">0</span></button><div class="metric metric-good"><div class="metric-label">Marcadores en el mapa</div><div class="metric-value" id="homePinCount">0</div></div></div>
+    <section id="homeDetailPanel" class="panel" style="padding:15px;margin:0 0 18px" hidden><div class="home-detail-head"><h2 id="homeDetailTitle">Detalle de checks</h2><button id="closeHomeDetail" class="secondary" type="button">Cerrar</button></div><div id="homeDetailList" class="home-detail-list"></div></section>
     <section class="panel" style="padding:15px;margin-bottom:18px"><h2>Riesgo inminente por periodo</h2><div class="home-periods"><div class="home-period-row"><div class="home-period-name" id="homeShiftLabel">Turno actual</div><div class="home-period-metric">Checks capturados<strong id="homeShiftChecks">0</strong></div><div class="home-period-metric">Territorios con riesgo<strong id="homeShiftRisks">0</strong></div></div><div class="home-period-row"><div class="home-period-name" id="homeDayLabel">Día actual</div><div class="home-period-metric">Checks capturados<strong id="homeDayChecks">0</strong></div><div class="home-period-metric">Territorios con riesgo<strong id="homeDayRisks">0</strong></div></div><div class="home-period-row"><div class="home-period-name" id="homeWeekLabel">Semana actual</div><div class="home-period-metric">Checks capturados<strong id="homeWeekChecks">0</strong></div><div class="home-period-metric">Territorios con riesgo<strong id="homeWeekRisks">0</strong></div></div><div class="home-period-row"><div class="home-period-name" id="homeMonthLabel">Mes actual</div><div class="home-period-metric">Checks capturados<strong id="homeMonthChecks">0</strong></div><div class="home-period-metric">Territorios con riesgo<strong id="homeMonthRisks">0</strong></div></div></div></section>
     <div class="summary-cards"><button type="button" data-view="register">＋ Registrar check</button><button type="button" data-view="records">Ver y gestionar registros</button><button type="button" data-view="map">Abrir mapa de riesgo</button></div>
   </section>
@@ -366,7 +380,7 @@
       <div class="form-actions"><button id="saveReport" type="submit">Enviar check</button><button id="cancelEdit" class="secondary" type="button" hidden>Cancelar</button></div><div id="reportFormStatus" class="status" role="status"></div>
     </form>
   </section>
-  <section id="recordsView" class="workspace-view" hidden><div class="workspace-head"><div><h2>Gestión de registros</h2><div class="summary-note" id="recordsCount">Consulta y actualiza los checks recientes.</div></div><button id="newReport" type="button" style="width:auto">＋ Nuevo check</button></div><div class="records-card"><div class="records-toolbar"><input id="reportSearch" type="search" placeholder="Buscar por dueño, departamento o territorio"><select id="riskFilter"><option value="">Todos los resultados</option><option>NOK</option><option>OK</option></select><select id="statusFilter"><option value="">Todas las acciones</option><option>En seguimiento</option><option>Sin acción</option></select><input id="reportsFrom" type="date" aria-label="Fecha inicial para consultar registros antiguos"><input id="reportsTo" type="date" aria-label="Fecha final para consultar registros antiguos"><button id="loadOlderReports" class="secondary" type="button" style="width:auto">Consultar fechas anteriores</button><button id="exportReports" class="secondary" type="button" style="width:auto">Exportar JSON</button></div><div id="reportsList" class="reports-list"></div></div></section>
+  <section id="recordsView" class="workspace-view" hidden><div class="workspace-head"><div><h2>Gestión de registros</h2><div class="summary-note" id="recordsCount">Consulta y actualiza los checks recientes.</div></div><button id="newReport" type="button" style="width:auto">＋ Nuevo check</button></div><div class="records-card"><div class="records-toolbar"><input id="reportSearch" type="search" placeholder="Buscar por dueño, departamento o territorio"><select id="riskFilter"><option value="">Todos los resultados</option><option>NOK</option><option>OK</option></select><select id="statusFilter"><option value="">Todas las acciones</option><option>En seguimiento</option><option>Atendido</option><option>Sin acción</option></select><input id="reportsFrom" type="date" aria-label="Fecha inicial para consultar registros antiguos"><input id="reportsTo" type="date" aria-label="Fecha final para consultar registros antiguos"><button id="loadOlderReports" class="secondary" type="button" style="width:auto">Consultar fechas anteriores</button><button id="exportReports" class="secondary" type="button" style="width:auto">Exportar JSON</button></div><div id="reportsList" class="reports-list"></div></div></section>
   <main id="mapView">
     <aside id="territorySidebar" class="territory-sidebar" aria-label="Lista de territorios">
       <div class="territory-sidebar-head"><div><h2>Territorios</h2><p>Verde claro: ubicado en el layout · Rojo: pendiente de ubicar</p></div></div>
@@ -421,6 +435,7 @@
   // URL de la aplicación web de Apps Script desplegada para este proyecto.
   const GOOGLE_SCRIPT_URL='https://script.google.com/macros/s/AKfycbz6uhRNKaX9929kaKkyW_D64iQ0qY2RFB8XsorlrdF0eWRatIzTsS2XSO3JJWMlaLs/exec';
   let dataLoadPromise=null,inventoryLoadPromise=null,renderTurnWindow=null;
+  let homeDetailMode='all';
   const $=id=>document.getElementById(id);
   const NA_CHANGE_PASSWORD='SFT';
   const state={territories:[], territoryRows:[], inventoryRows:[], shifts:[], records:[], initialRange:null,weekRecordsCache:{},weekLoads:{},historicalReports:[],homePeriodReports:[],googleChecks:[],shiftExemptions:new Set(),weeklyRows:[], summaryDayIndex:-1,currentShift:0,selectedWeek:0,selectedWeekYear:0,collapsedDays:new Set([0,1,2,3,4,5,6]), loaded:false, inventoryLoaded:false, pins:[], selected:null, locationDraft:null, placementMode:false, userReports:[],ownedReportIds:new Set(),legacyReports:[],legacyPins:[],sharedMigrationDone:false};
@@ -470,10 +485,15 @@
     const [year,month,day]=parts,iso=isoWeek(year,month,day);
     return {year,month,day,shift:shiftNumber(report?.shift||report?.turno),date:dateKey(year,month,day),week:iso.week,weekYear:iso.year};
   }
+  function reportSortTime(report){const stamp=report?.recordedAt||report?.submissionTimestamp||report?.submittedAt||report?.timestamp||report?.createdAt||report?.date;const value=Date.parse(stamp||'');return Number.isFinite(value)?value:0;}
+  function activeRiskReports(reports=homeReports()){
+    const latest=new Map();for(const report of reports){const key=`${normalizeKey(report.department||report.departamento||report.company)}|${normalizeKey(report.area||report.territory||report.territorio)}`;if(key.endsWith('|'))continue;const previous=latest.get(key);if(!previous||reportSortTime(report)>=reportSortTime(previous))latest.set(key,report);}
+    return [...latest.values()].filter(isImminentRisk).sort((a,b)=>reportSortTime(b)-reportSortTime(a));
+  }
   function renderHome(){
     const reports=homeReports(),nowPeriod=periodFromTimestamp(new Date()),timed=reports.map(report=>({report,period:reportPeriod(report)})).filter(item=>item.period);
     const riskTerritories=items=>new Set(items.filter(item=>isImminentRisk(item.report)).map(({report})=>`${normalizeKey(report.department||report.departamento||report.company)}|${normalizeKey(report.area||report.territory||report.territorio)}`)).size;
-    $('homeReportCount').textContent=reports.length.toLocaleString('es-MX');$('homeHighCount').textContent=riskTerritories(timed).toLocaleString('es-MX');$('homePinCount').textContent=state.pins.length.toLocaleString('es-MX');
+    $('homeReportCount').textContent=reports.length.toLocaleString('es-MX');$('homeHighCount').textContent=activeRiskReports(reports).length.toLocaleString('es-MX');$('homePinCount').textContent=state.pins.length.toLocaleString('es-MX');
     const d=new Date(`${nowPeriod.date}T00:00:00Z`),dayLabel=new Intl.DateTimeFormat('es-MX',{timeZone:'UTC',day:'2-digit',month:'short',year:'numeric'}).format(d),monthLabel=new Intl.DateTimeFormat('es-MX',{timeZone:'UTC',month:'long',year:'numeric'}).format(d);
     const periods=[
       {key:'Shift',label:`Turno actual · ${turnNames[nowPeriod.shift-1]}`,match:p=>p.date===nowPeriod.date&&p.shift===nowPeriod.shift},
@@ -482,6 +502,32 @@
       {key:'Month',label:`Mes actual · ${monthLabel}`,match:p=>p.year===nowPeriod.year&&p.month===nowPeriod.month}
     ];
     for(const period of periods){const items=timed.filter(item=>period.match(item.period));$(`home${period.key}Label`).textContent=period.label;$(`home${period.key}Checks`).textContent=items.length.toLocaleString('es-MX');$(`home${period.key}Risks`).textContent=riskTerritories(items).toLocaleString('es-MX');}
+    if(!$('homeDetailPanel').hidden)renderHomeDetail();
+  }
+  function renderHomeDetail(){
+    const reports=homeDetailMode==='risk'?activeRiskReports():homeReports().sort((a,b)=>reportSortTime(b)-reportSortTime(a));
+    $('homeDetailTitle').textContent=homeDetailMode==='risk'?`Territorios con riesgo inminente (${reports.length})`:`Checks cargados (${reports.length})`;
+    $('homeDetailList').innerHTML=reports.length?reports.map(report=>{const imminent=isImminentRisk(report),status=report.status||'Sin estado',timestamp=report.recordedAt||report.submissionTimestamp||report.date||'',description=report.description||report.actionDetails||'Sin detalle de acción';return `<article class="home-detail-item ${imminent?'imminent-risk':''}"><div><h3>${esc(report.area||report.territory||report.territorio||'Sin territorio')} · ${esc(report.department||report.departamento||report.company||'Sin departamento')}</h3><p>${esc(report.owner||'Sin nombre')} · SAP ${esc(report.sap||'—')} · ${esc(timestamp)}${report.shift?' · '+esc(report.shift):''}</p><p>Riesgo inminente: <strong>${imminent?'Sí':'No'}</strong> · Estado: <strong>${esc(status)}</strong></p><p>${esc(description)}</p></div>${imminent?`<button type="button" data-resolve-risk="${esc(report.id)}">Marcar riesgo atendido</button>`:''}</article>`;}).join(''):'<div class="empty-reports">No hay registros para mostrar en esta lista.</div>';
+  }
+  function openHomeDetail(mode){homeDetailMode=mode;$('homeDetailPanel').hidden=false;renderHomeDetail();$('homeDetailPanel').scrollIntoView({behavior:'smooth',block:'nearest'});}
+  $('homeChecksCard').addEventListener('click',()=>openHomeDetail('all'));
+  $('homeRiskCard').addEventListener('click',()=>openHomeDetail('risk'));
+  $('closeHomeDetail').addEventListener('click',()=>$('homeDetailPanel').hidden=true);
+  $('homeDetailList').addEventListener('click',ev=>{const button=ev.target.closest('[data-resolve-risk]');if(button)markRiskAttended(button.dataset.resolveRisk,button);});
+  async function markRiskAttended(id,button){
+    const report=homeReports().find(item=>String(item.id)===String(id));if(!report||!isImminentRisk(report))return;
+    if(!window.confirm(`¿Confirmas que el riesgo de ${report.area||report.territory||'este territorio'} fue atendido y puede cambiar de rojo a verde?`))return;
+    const resolvedAt=new Date().toISOString(),note=`Riesgo inminente atendido el ${new Date(resolvedAt).toLocaleString('es-MX')}.`,description=[report.description,report.riskResolution].filter(Boolean).join('\n');
+    const updated={...report,imminentRisk:'No',status:'Atendido',riskResolvedAt:resolvedAt,riskResolution:note,description:description.includes(note)?description:`${description}${description?'\n':''}${note}`};
+    button.disabled=true;button.textContent='Guardando…';
+    try{
+      await postShared({action:'submit',report:updated});
+      await refreshSharedData();await loadHomePeriodReports();
+      const saved=homeReports().find(item=>String(item.id)===String(id));
+      if(!saved||isImminentRisk(saved))throw new Error('La hoja no confirmó el cambio de riesgo. Revisa que Apps Script permita actualizar el mismo ID de reporte.');
+      state.googleChecks=state.googleChecks.map(check=>normalizeKey(check.department)===normalizeKey(updated.department)&&normalizeKey(check.territory)===normalizeKey(updated.area)?{...check,imminentRisk:'No'}:check);
+      renderHome();renderReports();render();renderHomeDetail();
+    }catch(err){button.disabled=false;button.textContent='Marcar riesgo atendido';window.alert(`No se pudo actualizar el reporte: ${err.message}`);}
   }
   function renderReports(){
     const query=normalizeKey($('reportSearch').value),risk=$('riskFilter').value,status=$('statusFilter').value;
