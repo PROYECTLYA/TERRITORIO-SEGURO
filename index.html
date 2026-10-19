@@ -831,7 +831,7 @@
           renderReports();renderHome();renderTerritoryList();
         }else throw new Error('El Apps Script publicado debe actualizarse para incluir las excepciones NA. Vuelve a desplegar la versión nueva de Code.gs.');
         const records=(payload.records||[]).map(normalizeCheckRecord).filter(Boolean);
-        state.records=records;state.initialRange=payload.range||null;state.googleChecks=(payload.statuses||[]).map(r=>({territory:norm(r.territory||r.territorio),department:norm(r.department||r.departamento),shift:norm(r.shift||r.turno),timestamp:r.timestamp||r.recordedAt||'',imminentRisk:r.imminentRisk??r.pregunta15??r.q15??''}));writeCache('analytics',{records,range:state.initialRange,checks:state.googleChecks,exemptions:[...state.shiftExemptions]});state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
+        state.records=records;state.initialRange=payload.range||null;state.googleChecks=[...(payload.statuses||[]),...(payload.records||[])].map(r=>({territory:norm(r.territory||r.territorio||r.area),department:norm(r.department||r.departamento||r.depto||r.company),shift:norm(r.shift||r.turno||r.declaredShift),timestamp:r.timestamp||r.recordedAt||r.submissionTimestamp||r.submittedAt||r.createdAt||r.startTimestamp||r.startTime||r.horaInicio||r['Hora de inicio']||'',imminentRisk:riskAnswerValue(r)})).filter(r=>riskAnswerState(r.imminentRisk));writeCache('analytics',{records,range:state.initialRange,checks:state.googleChecks,exemptions:[...state.shiftExemptions]});state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas del periodo reciente`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
         $('recordStatus').textContent=state.sharedMigrationDone?'Checks, ubicaciones y estatus compartidos desde Google Sheets; actualización automática cada 15 segundos.':'Conexión compartida activa. Sincronizando ubicaciones y registros guardados anteriormente en este navegador…';
@@ -908,18 +908,33 @@
     const startsAt=localWallAsUtc+(localWallAsUtc-renderedWallAsUtc);
     return {shift,startsAt,now:now.getTime()};
   }
+  function riskAnswerValue(record){
+    const direct=record?.imminentRisk??record?.pregunta15??record?.q15??record?.pregunta12??record?.q12??record?.answers?.imminentRisk??record?.answers?.pregunta12??record?.answers?.q12??record?.answers?.['12'];
+    if(direct!==undefined&&direct!==null&&String(direct).trim()!=='')return direct;
+    const question=Object.keys(record||{}).find(key=>{const normalized=normalizeKey(key);return normalized.includes('riesgo')&&normalized.includes('inminente');});
+    return question?record[question]:'';
+  }
+  function riskAnswerState(value){const answer=normalizeKey(value);if(answer==='no'||answer==='false'||answer==='0'||answer.startsWith('no '))return 'no';if(answer==='si'||answer==='yes'||answer==='true'||answer==='1'||answer.startsWith('si ')||answer.startsWith('si,')||answer.startsWith('yes '))return 'si';return '';}
   function pinRiskStatus(department,territory){
     const turn=renderTurnWindow||currentTurnWindow();
-    const checks=state.googleChecks.filter(r=>{
+    const reportChecks=state.userReports.map(report=>{
+      const answer=riskAnswerValue(report);
+      if(answer===undefined||answer===null||String(answer).trim()==='')return null;
+      return {territory:report.territory??report.area??report.territorio,department:report.department??report.departamento??report.depto??report.company,shift:report.shift??report.turno??report.declaredShift,timestamp:report.recordedAt??report.submissionTimestamp??report.submittedAt??report.timestamp??report.createdAt,imminentRisk:answer};
+    }).filter(Boolean);
+    const checks=[...reportChecks,...state.googleChecks].filter(r=>{
       const rowTerritory=norm(r.territory??r.territorio??r.area);
       const rowDepartment=norm(r.department??r.departamento??r.depto);
       if(normalizeKey(rowTerritory)!==normalizeKey(territory))return false;
       if(rowDepartment&&normalizeKey(rowDepartment)!==normalizeKey(department))return false;
-      const timestamp=Date.parse(r.timestamp||'');
-      return shiftNumber(r.shift??r.turno)===turn.shift&&Number.isFinite(timestamp)&&timestamp>=turn.startsAt&&timestamp<=turn.now;
-    }).sort((a,b)=>Date.parse(b.timestamp||'')-Date.parse(a.timestamp||''));
+      if(!riskAnswerState(riskAnswerValue(r)))return false;
+      const timestamp=Date.parse(r.timestamp??r.recordedAt??r.submissionTimestamp??r.submittedAt??r.createdAt??'');
+      if(!Number.isFinite(timestamp)||timestamp<turn.startsAt||timestamp>turn.now)return false;
+      const timestampShift=periodFromTimestamp(timestamp)?.shift;
+      return (timestampShift||shiftNumber(r.shift??r.turno))===turn.shift;
+    }).sort((a,b)=>Date.parse(b.timestamp??b.recordedAt??b.submissionTimestamp??b.submittedAt??b.createdAt??'')-Date.parse(a.timestamp??a.recordedAt??a.submissionTimestamp??a.submittedAt??a.createdAt??''));
     if(!checks.length)return 'risk';
-    return normalizeKey(checks[0].imminentRisk??checks[0].pregunta15??checks[0].q15)==='no'?'safe':'alert';
+    return riskAnswerState(riskAnswerValue(checks[0]))==='no'?'safe':'alert';
   }
   function appendDangerBadge(group,unit){
     const badge=document.createElementNS('http://www.w3.org/2000/svg','circle');badge.setAttribute('cx',String(11*unit));badge.setAttribute('cy',String(-11*unit));badge.setAttribute('r',String(7*unit));badge.setAttribute('fill','#d92d20');badge.setAttribute('stroke','white');badge.style.strokeWidth=String(2*unit)+'px';
@@ -1265,11 +1280,10 @@
     if(getCacheConsent()==='yes'){initializeLayoutCache();const inventory=await readCache('inventory',1800000);applyCachedInventory(inventory);const analytics=await readCache('analytics',300000);applyCachedAnalytics(analytics);restoreLocalPreferences();renderReports();renderTerritoryList();renderWeeklyTable();}
     loadInventoryData().then(()=>{restoreLocalPreferences();loadPublicData().then(loadHomePeriodReports);});
   })();
-  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},60000);
+  setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},15000);
   setInterval(loadHomePeriodReports,300000);
   setInterval(()=>loadInventoryData(),300000);
 })();
 </script>
 </body>
 </html>
-
