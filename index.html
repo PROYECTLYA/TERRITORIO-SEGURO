@@ -425,7 +425,7 @@
   </main>
   <section id="summaryView" class="summary-view" hidden>
     <div class="summary-head"><div><h2>Análisis detallado de reportes</h2><div id="summaryContext" class="summary-note">Conectando con los datos publicados…</div></div><div class="summary-note">Turnos: 1.º 22:00–06:00 · 2.º 06:00–14:00 · 3.º 14:00–22:00</div></div>
-    <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Territorios con turnos esperados</div><div class="metric-value" id="totalTerritories">—</div></div><div class="metric metric-good"><div class="metric-label">Cumplen todos los turnos transcurridos</div><div class="metric-value" id="compliantTerritories">—</div></div><div class="metric metric-bad"><div class="metric-label">Con reportes pendientes</div><div class="metric-value" id="pendingTerritories">—</div></div></div>
+    <div class="summary-cards"><div class="metric metric-total"><div class="metric-label">Territorios del inventario</div><div class="metric-value" id="totalTerritories">—</div></div><div class="metric metric-good"><div class="metric-label">Cumplen todos los turnos transcurridos</div><div class="metric-value" id="compliantTerritories">—</div></div><div class="metric metric-bad"><div class="metric-label">Con reportes pendientes</div><div class="metric-value" id="pendingTerritories">—</div></div></div>
     <div class="area-charts"><div class="panel"><h3>Cumplimiento Semanal</h3><div id="weeklyChartCaption" class="summary-note">Acumulado hasta el día y turno vigente, agrupado por área.</div><div id="weeklyAreaChart" class="area-chart-wrap"><div class="empty-summary">Cargando datos publicados…</div></div><div class="chart-legend">Rojo: menor de 80% · Amarillo: 80–89% · Verde: 90% o más</div></div><div class="panel"><h3>D-1</h3><div id="d1ChartCaption" class="summary-note">Cumplimiento del día calendario anterior, considerando sus tres turnos.</div><div id="d1AreaChart" class="area-chart-wrap"><div class="empty-summary">Cargando datos publicados…</div></div><div class="chart-legend">Rojo: menor de 80% · Amarillo: 80–89% · Verde: 90% o más</div></div></div>
     <div class="panel"><div class="table-toolbar"><div><h3>Detalle semanal por territorio y turno</h3><div id="tableCaption" class="summary-note">La tabla sigue la estructura de “Territorio Safety”.</div></div><div class="table-actions"><label for="tableWeek">Semana</label><select id="tableWeek" aria-label="Filtrar por semana"></select><button id="exportWeeklyTable" type="button">Exportar a Excel</button><button id="toggleAllShifts" type="button">Mostrar todos los turnos</button><input id="tableSearch" type="search" placeholder="Buscar área o territorio"></div></div><div class="table-wrap"><div id="weeklyTable"><div class="empty-summary">Cargando datos publicados…</div></div></div></div>
   </section>
@@ -646,9 +646,10 @@
         const payload=await requestInventorySheet();
         if(payload?.status==='error')throw new Error(payload.errors?.[0]?.detailed_message||'Google Sheets devolvió un error al leer INVENTARIO.');
         const rawRows=(payload?.table?.rows||[]).map(row=>({department:norm(row.c?.[0]?.v??row.c?.[0]?.f),line:norm(row.c?.[1]?.v??row.c?.[1]?.f),territory:norm(row.c?.[2]?.v??row.c?.[2]?.f)})).filter(row=>row.department&&row.territory);
-        const seen=new Set(),rowsFound=rawRows.filter(row=>{const key=`${normalizeKey(row.department)}|${normalizeKey(row.line)}|${normalizeKey(row.territory)}`;if(seen.has(key))return false;seen.add(key);return true;});
+        // Cada fila válida de INVENTARIO cuenta como un territorio del catálogo, incluso si hay filas iguales.
+        const rowsFound=rawRows.filter(row=>row.department&&row.territory);
         if(!rowsFound.length)throw new Error('La hoja INVENTARIO no devolvió Departamento, Línea y Territorio en las columnas A, B y C.');
-        state.inventoryRows=rowsFound;writeCache('inventory',rowsFound);state.territoryRows=rowsFound.map(r=>({line:lineForInventoryRow(r),department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
+        state.inventoryRows=rowsFound;writeCache('inventory-v2',rowsFound);state.territoryRows=rowsFound.map(r=>({line:lineForInventoryRow(r),department:r.department,territory:r.territory}));state.territories=[...new Set(rowsFound.map(r=>r.territory))];state.inventoryLoaded=true;
         state.legacyPins=state.legacyPins.map(p=>{
           if(p.department)return p;
           const departments=[...new Set(rowsFound.filter(r=>normalizeKey(r.territory)===normalizeKey(p.territory)).map(r=>r.department))];
@@ -1164,7 +1165,7 @@
       const weeklyRate=weekExpected?weekCompleted/weekExpected:null,d1Rate=d1Expected?d1Completed/d1Expected:null,expectedSlots=weekExpected;
       return {...meta,area,department,cells,dailyRates,dailyExpected,weeklyRate,weekCompleted,weekExpected,allComplete:expectedSlots>0&&allComplete,d1Rate,d1Completed,d1Expected,expectedSlots};
     });
-    const total=state.weeklyRows.filter(r=>r.expectedSlots>0).length, compliant=state.weeklyRows.filter(r=>r.allComplete).length;
+    const total=state.weeklyRows.length, compliant=state.weeklyRows.filter(r=>r.allComplete).length;
     $('totalTerritories').textContent=total.toLocaleString('es-MX');
     $('compliantTerritories').textContent=compliant.toLocaleString('es-MX');
     $('pendingTerritories').textContent=(total-compliant).toLocaleString('es-MX');
@@ -1277,7 +1278,7 @@
   $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state.pins,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ubicaciones-territorios-seguros.json';a.click();URL.revokeObjectURL(a.href);});
   populateLocationDepartments();renderTerritoryList();render();resetReportForm();renderReports();showView('home');
   (async()=>{
-    if(getCacheConsent()==='yes'){initializeLayoutCache();const inventory=await readCache('inventory',1800000);applyCachedInventory(inventory);const analytics=await readCache('analytics',300000);applyCachedAnalytics(analytics);restoreLocalPreferences();renderReports();renderTerritoryList();renderWeeklyTable();}
+    if(getCacheConsent()==='yes'){initializeLayoutCache();const inventory=await readCache('inventory-v2',1800000);applyCachedInventory(inventory);const analytics=await readCache('analytics',300000);applyCachedAnalytics(analytics);restoreLocalPreferences();renderReports();renderTerritoryList();renderWeeklyTable();}
     loadInventoryData().then(()=>{restoreLocalPreferences();loadPublicData().then(loadHomePeriodReports);});
   })();
   setInterval(()=>{loadPublicData();if(!$('summaryView').hidden)updateSummary();},15000);
