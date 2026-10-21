@@ -767,13 +767,27 @@
     return {year,month,day,shift,dayName,date:dateKey(year,month,day),week:iso.week,weekYear:iso.year};
   }
   function normalizeCheckRecord(record){
-    const stamp=record.recordedAt||record.submissionTimestamp||record.submittedAt||record.timestamp||record.createdAt||record.startTimestamp||record.startTime||record.horaInicio||record['Hora de inicio'];
+    const stamp=record.recordedAt||record.submissionTimestamp||record.submittedAt||record.timestamp||record.createdAt||record.startTimestamp||record.startTime||record.horaInicio||record['Hora de inicio']||record['Marca temporal']||record['Marca de tiempo'];
     const period=stamp?periodFromTimestamp(stamp):null;
     const datePartsValue=dateParts(record.date||record.checkDate||record.fecha);
     const derived=period|| (datePartsValue?{year:datePartsValue[0],month:datePartsValue[1],day:datePartsValue[2],shift:shiftNumber(record.shift||record.turno),date:dateKey(...datePartsValue)}:null);
     const territory=norm(record.territory||record.area||record.territorio),department=norm(record.department||record.departamento||record.depto);
     if(!derived||!territory)return null;
     return {year:derived.year,month:derived.month,day:derived.day,shift:period?turnNames[period.shift-1]:norm(record.shift||record.turno),territory,department,recordedAt:stamp||''};
+  }
+  function mergeAnalysisRecords(...sources){
+    const merged=new Map();
+    for(const source of sources){
+      if(!Array.isArray(source))continue;
+      for(const raw of source){
+        const record=normalizeCheckRecord(raw);if(!record)continue;
+        const turn=shiftNumber(record.shift);if(!turn)continue;
+        const key=`${normalizeKey(record.department)}|${normalizeKey(record.territory)}|${dateKey(record.year,record.month,record.day)}|${turn}`;
+        const previous=merged.get(key);
+        if(!previous||(!previous.recordedAt&&record.recordedAt))merged.set(key,record);
+      }
+    }
+    return [...merged.values()];
   }
   function jsonp(url){return new Promise((resolve,reject)=>{const callback='tsCallback_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script'),timer=setTimeout(()=>finish(new Error('Tiempo de espera agotado al consultar Google Sheets.')),20000);function finish(error,value){clearTimeout(timer);delete window[callback];script.remove();error?reject(error):resolve(value);}window[callback]=value=>finish(null,value);script.onerror=()=>finish(new Error('No se pudo consultar el servicio de Google Sheets.'));script.src=`${url}${url.includes('?')?'&':'?'}callback=${callback}&_=${Date.now()}`;document.head.appendChild(script);});}
   async function postShared(payload){const response=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});return response;}
@@ -831,7 +845,7 @@
           persistReports();
           renderReports();renderHome();renderTerritoryList();
         }else throw new Error('El Apps Script publicado debe actualizarse para incluir las excepciones NA. Vuelve a desplegar la versión nueva de Code.gs.');
-        const records=(payload.records||[]).map(normalizeCheckRecord).filter(Boolean);
+        const records=mergeAnalysisRecords(payload.records,payload.reports);
         state.records=records;state.initialRange=payload.range||null;state.googleChecks=[...(payload.statuses||[]),...(payload.records||[])].map(r=>({territory:norm(r.territory||r.territorio||r.area),department:norm(r.department||r.departamento||r.depto||r.company),shift:norm(r.shift||r.turno||r.declaredShift),timestamp:r.timestamp||r.recordedAt||r.submissionTimestamp||r.submittedAt||r.createdAt||r.startTimestamp||r.startTime||r.horaInicio||r['Hora de inicio']||'',imminentRisk:riskAnswerValue(r)})).filter(r=>riskAnswerState(r.imminentRisk));writeCache('analytics',{records,range:state.initialRange,checks:state.googleChecks,exemptions:[...state.shiftExemptions]});state.shifts=[...new Set(records.map(r=>r.shift).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));state.loaded=true;
         $('count').textContent=`${state.territories.length} territorios · ${records.length.toLocaleString('es-MX')} respuestas del periodo reciente`;
         $('bookStatus').textContent=`Google Sheets actualizado: ${new Date().toLocaleString('es-MX')}.`;
@@ -1133,7 +1147,7 @@
     let analysisRecords=inInitialRange?state.records:state.weekRecordsCache[weekKey];
     if(!analysisRecords){
       $('tableCaption').textContent=`Consultando de forma independiente la semana ${selectedWeek}…`;
-      if(!state.weekLoads[weekKey])state.weekLoads[weekKey]=jsonp(`${GOOGLE_SCRIPT_URL}?action=reports&from=${weekFrom}&to=${weekTo}`).then(payload=>{if(!payload?.ok)throw new Error(payload?.error||'Google Sheets no devolvió el historial solicitado.');const source=Array.isArray(payload.records)?payload.records:(Array.isArray(payload.reports)?payload.reports:[]);state.weekRecordsCache[weekKey]=source.map(normalizeCheckRecord).filter(Boolean).filter(r=>{const iso=isoWeek(r.year,r.month,r.day);return iso.year===currentISO.year&&iso.week===selectedWeek;});}).catch(err=>{$('tableCaption').textContent=`No se pudo consultar la semana ${selectedWeek}: ${err.message}`;}).finally(()=>{delete state.weekLoads[weekKey];if(state.weekRecordsCache[weekKey]&&state.selectedWeek===selectedWeek&&state.selectedWeekYear===currentISO.year)updateSummary();});
+      if(!state.weekLoads[weekKey])state.weekLoads[weekKey]=jsonp(`${GOOGLE_SCRIPT_URL}?action=reports&from=${weekFrom}&to=${weekTo}`).then(payload=>{if(!payload?.ok)throw new Error(payload?.error||'Google Sheets no devolvió el historial solicitado.');state.weekRecordsCache[weekKey]=mergeAnalysisRecords(payload.records,payload.reports).filter(r=>{const iso=isoWeek(r.year,r.month,r.day);return iso.year===currentISO.year&&iso.week===selectedWeek;});}).catch(err=>{$('tableCaption').textContent=`No se pudo consultar la semana ${selectedWeek}: ${err.message}`;}).finally(()=>{delete state.weekLoads[weekKey];if(state.weekRecordsCache[weekKey]&&state.selectedWeek===selectedWeek&&state.selectedWeekYear===currentISO.year)updateSummary();});
       return;
     }
     const previousDate=new Date(cutoffDate.getTime()-86400000), d1Key=dateKey(previousDate.getUTCFullYear(),previousDate.getUTCMonth()+1,previousDate.getUTCDate());
